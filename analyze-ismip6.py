@@ -107,20 +107,72 @@ def set_size(w, h, ax=None):
 
 def plot_prognostic(out_filename, df):
 
-    # Dataframe with Year 2100 only for histogram
-    m_df = df[df["Time"] == 2100]
+    xmin = np.floor(df[df["Time"] == 2100]["SLE (cm)"].min())
+    xmax = np.ceil(df[df["Time"] == 2100]["SLE (cm)"].max())
 
-    fig, ax = plt.subplots(1, 2, sharey="col", figsize=[6.2, 3.1], gridspec_kw=dict(width_ratios=[3, 1]))
-    fig.subplots_adjust(wspace=0.05)
-    [
-        ax[0].plot(g[-1]["Time"], g[-1]["SLE (cm)"], color="0.5", alpha=0.5, linewidth=0.5)
-        for g in df.groupby(by=["Group", "Model", "Exp"])
-    ]
-    # sns.lineplot(x="Time", y="SLE (cm)", data=df, hue="Group", palette="tab20", linewidth=0.5, ax=ax[0])
-    sns.histplot(m_df, y="SLE (cm)", stat="density", bins=np.linspace(0, 20, 21), kde=True, color="0.5", ax=ax[1])
+    # Dataframe with Year 2100 only for histogram
+    p_df = df[(df["Time"] == 2100) & (df["Meet_Threshold"] == True)]
+    f_df = df[(df["Time"] == 2100) & (df["Meet_Threshold"] == False)]
+
+    fig, ax = plt.subplots(1, 2, sharey="col", figsize=[6.2, 2.0], gridspec_kw=dict(width_ratios=[20, 1]))
+    fig.subplots_adjust(wspace=0.025)
+
+    def plot_signal(g):
+        if g[-1]["Meet_Threshold"].any() == True:
+            signal_color = "#238b45"
+        else:
+            signal_color = "0.5"
+
+        return ax[0].plot(g[-1]["Time"], g[-1]["SLE (cm)"], color=signal_color, linewidth=0.5)
+
+    [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
+    # sns.histplot(
+    #     f_df,
+    #     y="SLE (cm)",
+    #     bins=np.linspace(-2, 20, 23),
+    #     kde=True,
+    #     fill=False,
+    #     color="0.5",
+    #     ax=ax[1],
+    # )
+    # sns.histplot(
+    #     p_df,
+    #     y="SLE (cm)",
+    #     bins=np.linspace(-2, 20, 23),
+    #     kde=True,
+    #     fill=False,
+    #     color="#238b45",
+    #     ax=ax[1],
+    # )
+    # sns.kdeplot(
+    #     data=df[df["Time"] == 2100],
+    #     y="SLE (cm)",
+    #     hue="Meet_Threshold",
+    #     palette=["0.5", "#238b45"],
+    #     common_norm=False,
+    #     clip=[xmin, xmax],
+    #     linewidth=0.75,
+    #     legend=False,
+    #     ax=ax[1],
+    # )
+    sns.boxplot(
+        data=df[df["Time"] == 2100],
+        x="Meet_Threshold",
+        y="SLE (cm)",
+        hue="Meet_Threshold",
+        palette=["0.5", "#238b45"],
+        width=0.8,
+        linewidth=0.75,
+        fliersize=0.40,
+        ax=ax[1],
+    )
     sns.despine(ax=ax[1], left=True, bottom=True)
-    ax[0].set_ylim(-1, 20)
-    ax[1].set_ylim(-1, 20)
+    try:
+        ax[1].get_legend().remove()
+    except:
+        pass
+    ax[0].set_ylim(xmin, xmax)
+    ax[1].set_ylim(xmin, xmax)
     ax[0].set_xlim(proj_start, proj_end)
     ax[1].set_xlabel(None)
     ax[1].set_ylabel(None)
@@ -131,24 +183,42 @@ def plot_prognostic(out_filename, df):
     fig.savefig(out_filename, bbox_inches="tight")
 
 
-def plot_historical(out_filename, df, grace):
-
-    signal_color = "0.75"
-
-    grace_hist_df = grace[(grace["Time"] > hist_start) & (grace["Time"] < proj_end)]
-    x = grace_hist_df["Time"]
-    y = grace_hist_df["Mass"][(grace["Time"] > hist_start) & (grace["Time"] < proj_end)]
-    p = trend_estimator(x, y)[0]
-    grace_bias = p[0]
-    grace_trend = p[1]
+def plot_historical(out_filename, df, grace, model_trends):
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
+    def plot_signal(g):
+        m_df = g[-1]
+        x = m_df["Time"]
+        y = m_df["Mass (Gt)"]
+        if m_df["Meet_Threshold"].values[0]:
+            signal_color = "#74c476"
+        else:
+            signal_color = "0.75"
+
+        return ax.plot(x, y, color=signal_color, linewidth=0.5)
+
+    def plot_trend(model_trend):
+        if np.abs(1 - model_trend / grace_trend) < tolerance:
+            trend_color = "#238b45"
+        else:
+            trend_color = "0.5"
+
+        return ax.plot(
+            [hist_start, proj_start],
+            [model_trend * (hist_start - proj_start), 0],
+            color=trend_color,
+            linewidth=0.75,
+        )
+
+    [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
+    [plot_trend(row[-1]["Trend (Gt/yr)"]) for row in model_trends.iterrows()]
+
     ax.fill_between(
         grace["Time"], grace["Mass"] - 2 * grace["Sigma"], grace["Mass"] + 2 * grace["Sigma"], color="#9ecae1"
     )
-    ax.plot(grace["Time"], grace["Mass"], ":", color="#3182bd", linewidth=0.4)
+    ax.plot(grace["Time"], grace["Mass"], ":", color="#3182bd", linewidth=0.5)
     (l_g,) = ax.plot(
         [hist_start, proj_start],
         [grace_bias + grace_trend * hist_start, 0],
@@ -156,36 +226,7 @@ def plot_historical(out_filename, df, grace):
         linewidth=1.0,
     )
 
-    def plot_signal(g):
-        m_df = g[-1]
-        x = m_df["Time"]
-        y = m_df["Mass (Gt)"]
-        return ax.plot(x, y, color=signal_color, linewidth=0.5)
-
-    def plot_trend(g):
-        m_df = g[-1]
-        exp_hist_df = m_df[(m_df["Time"] > hist_start) & (m_df["Time"] < proj_end)]
-        x = exp_hist_df["Time"]
-        y = exp_hist_df["Mass (Gt)"]
-        p = trend_estimator(x, y)[0]
-        model_bias = p[0]
-        model_trend = p[1]
-        if np.abs(1 - model_trend / grace_trend) <= tolerance:
-            trend_color = "#238b45"
-        else:
-            trend_color = "0.5"
-
-        return ax.plot(
-            [hist_start, proj_start],
-            [model_bias + model_trend * hist_start, 0],
-            color=trend_color,
-            linewidth=0.75,
-        )
-
-    [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
-    [plot_trend(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
-
-    set_size(6, 3)
+    set_size(6, 2)
 
     ax.set_xlabel("Year")
     ax.set_ylabel("Cumulative mass change since 2015 (Gt)")
@@ -207,7 +248,7 @@ for path in Path(basedir).rglob("*_mm_*_historical.nc"):
 
 files = []
 
-hist_start = 2008
+hist_start = 2007
 hist_end = 2014
 proj_start = hist_end + 1
 proj_end = 2100
@@ -227,6 +268,13 @@ for d, data in domain.items():
     grace = pd.read_csv(data, header=30, delim_whitespace=True, skipinitialspace=True, names=["Time", "Mass", "Sigma"])
     grace["Mass"] -= np.interp(proj_start, grace["Time"], grace.Mass)
 
+    grace_hist_df = grace[(grace["Time"] >= hist_start) & (grace["Time"] <= proj_start)]
+    x = grace_hist_df["Time"]
+    y = grace_hist_df["Mass"][(grace["Time"] > hist_start) & (grace["Time"] <= proj_start)]
+    p = trend_estimator(x, y)[0]
+    grace_bias = p[0]
+    grace_trend = p[1]
+
     dfs = []
     for path in Path(basedir).rglob("*_mm_cr_*.nc"):
         files.append(path)
@@ -241,10 +289,10 @@ for d, data in domain.items():
             group, model, exp = f
         else:
             g1, g2, model, exp = f
-            group = f"{g1}-{g2}"
+            group = f"{g1}_{g2}"
 
-        ctrl_file = [m for m in ctrl_files if model in m.name][0]
-        hist_file = [m for m in hist_files if model in m.name][0]
+        ctrl_file = [m for m in ctrl_files if (f"{group}_{model}" in m.name)][0]
+        hist_file = [m for m in hist_files if (f"{group}_{model}" in m.name)][0]
 
         # The last entry of the historical and the first entry of the projection are the same
 
@@ -285,5 +333,45 @@ for d, data in domain.items():
     df = pd.concat(dfs)
     df = df.astype({"Time": float, "SLE (cm)": float, "Mass (Gt)": float, "Model": str, "Exp": str})
 
-    plot_historical(f"{d}_historical.pdf", df, grace)
-    # plot_prognostic(f"{d}_prognostic.pdf", df)
+    pass_dfs = []
+    fail_dfs = []
+    groups = []
+    models = []
+    exps = []
+    trends = []
+    for g in df.groupby(by=["Group", "Model", "Exp"]):
+        m_df = g[-1][(g[-1]["Time"] >= hist_start) & (g[-1]["Time"] <= proj_start)]
+        x = m_df["Time"]
+        y = m_df["Mass (Gt)"]
+        p = trend_estimator(x, y)[0]
+        model_bias = p[0]
+        model_trend = p[1]
+        groups.append(g[0][0])
+        models.append(g[0][1])
+        exps.append(g[0][2])
+        trends.append(model_trend)
+
+        if np.abs(1 - model_trend / grace_trend) <= tolerance:
+            pass_dfs.append(g[-1])
+        else:
+            fail_dfs.append(g[-1])
+    fail_df = pd.concat(fail_dfs)
+    fail_df["Meet_Threshold"] = False
+    pass_df = pd.concat(pass_dfs)
+    pass_df["Meet_Threshold"] = True
+    df = pd.concat([fail_df, pass_df])
+    model_trends = pd.DataFrame(
+        data=np.hstack(
+            [
+                np.array(groups).reshape(-1, 1),
+                np.array(models).reshape(-1, 1),
+                np.array(exps).reshape(-1, 1),
+                np.array(trends).reshape(-1, 1),
+            ]
+        ),
+        columns=["Group", "Model", "Exp", "Trend (Gt/yr)"],
+    )
+    model_trends = model_trends.astype({"Group": str, "Model": str, "Exp": str, "Trend (Gt/yr)": float})
+    model_trends = model_trends.groupby(by=["Group", "Model"]).mean().reset_index()
+    # plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
+    plot_prognostic(f"{d}_prognostic.pdf", df)
