@@ -134,12 +134,10 @@ def plot_prognostic(out_filename, df):
 def plot_historical(out_filename, df, grace):
 
     signal_color = "0.75"
-    trend_color = "0.5"
 
-    grace_mass = grace.mass.values - np.interp(proj_start, grace.time, grace.mass)
-    grace_sigma = grace.sigma.values
-    x = grace.time[np.logical_and(grace.time > hist_start, grace.time < hist_end)]
-    y = grace_mass[np.logical_and(grace.time > hist_start, grace.time < hist_end)]
+    grace_hist_df = grace[(grace["Time"] > hist_start) & (grace["Time"] < proj_end)]
+    x = grace_hist_df["Time"]
+    y = grace_hist_df["Mass"][(grace["Time"] > hist_start) & (grace["Time"] < proj_end)]
     p = trend_estimator(x, y)[0]
     grace_bias = p[0]
     grace_trend = p[1]
@@ -147,25 +145,42 @@ def plot_historical(out_filename, df, grace):
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    ax.fill_between(grace.time, grace_mass - 2 * grace_sigma, grace_mass + 2 * grace_sigma, color="#9ecae1")
-    ax.plot(grace.time, grace_mass, ":", color="#3182bd", linewidth=0.4)
+    ax.fill_between(
+        grace["Time"], grace["Mass"] - 2 * grace["Sigma"], grace["Mass"] + 2 * grace["Sigma"], color="#9ecae1"
+    )
+    ax.plot(grace["Time"], grace["Mass"], ":", color="#3182bd", linewidth=0.4)
     (l_g,) = ax.plot(
         [hist_start, proj_start],
-        [grace_bias + grace_trend * hist_start, grace_bias + grace_trend * proj_start],
+        [grace_bias + grace_trend * hist_start, 0],
         color="#2171b5",
         linewidth=1.0,
     )
 
     def plot_signal(g):
-        x = g[-1]["Time"]
-        y = g[-1]["Mass (Gt)"]
+        m_df = g[-1]
+        x = m_df["Time"]
+        y = m_df["Mass (Gt)"]
         return ax.plot(x, y, color=signal_color, linewidth=0.5)
 
     def plot_trend(g):
-        x = g[-1]["Time"]
-        y = g[-1]["Mass (Gt)"]
+        m_df = g[-1]
+        exp_hist_df = m_df[(m_df["Time"] > hist_start) & (m_df["Time"] < proj_end)]
+        x = exp_hist_df["Time"]
+        y = exp_hist_df["Mass (Gt)"]
         p = trend_estimator(x, y)[0]
-        return print(p[0], p[1])
+        model_bias = p[0]
+        model_trend = p[1]
+        if np.abs(1 - model_trend / grace_trend) <= tolerance:
+            trend_color = "#238b45"
+        else:
+            trend_color = "0.5"
+
+        return ax.plot(
+            [hist_start, proj_start],
+            [model_bias + model_trend * hist_start, 0],
+            color=trend_color,
+            linewidth=0.75,
+        )
 
     [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
     [plot_trend(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
@@ -209,7 +224,8 @@ domain = {"GIS": "greenland_mass_200204_202008.txt"}
 for d, data in domain.items():
     print(f"Analyzing {d}")
 
-    grace = pd.read_csv(data, header=30, delim_whitespace=True, skipinitialspace=True, names=["time", "mass", "sigma"])
+    grace = pd.read_csv(data, header=30, delim_whitespace=True, skipinitialspace=True, names=["Time", "Mass", "Sigma"])
+    grace["Mass"] -= np.interp(proj_start, grace["Time"], grace.Mass)
 
     dfs = []
     for path in Path(basedir).rglob("*_mm_cr_*.nc"):
