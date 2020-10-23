@@ -7,7 +7,6 @@ import numpy as np
 import os
 import pylab as plt
 import pandas as pd
-import statsmodels.api as sm
 import seaborn as sns
 from glob import glob
 from pathlib import Path
@@ -119,7 +118,7 @@ def plot_prognostic(out_filename, df):
 
     def plot_signal(g):
         if g[-1]["Meet_Threshold"].any() == True:
-            signal_color = "#238b45"
+            signal_color = "#74c476"
         else:
             signal_color = "0.5"
 
@@ -161,6 +160,56 @@ def plot_prognostic(out_filename, df):
         y="SLE (cm)",
         hue="Meet_Threshold",
         palette=["0.5", "#238b45"],
+        width=0.8,
+        linewidth=0.75,
+        fliersize=0.40,
+        ax=ax[1],
+    )
+    sns.despine(ax=ax[1], left=True, bottom=True)
+    try:
+        ax[1].get_legend().remove()
+    except:
+        pass
+    ax[0].set_ylim(xmin, xmax)
+    ax[1].set_ylim(xmin, xmax)
+    ax[0].set_xlim(proj_start, proj_end)
+    ax[1].set_xlabel(None)
+    ax[1].set_ylabel(None)
+    ax[1].axes.xaxis.set_visible(False)
+    ax[1].axes.yaxis.set_visible(False)
+    ax[0].set_xlabel("Year")
+    ax[0].set_ylabel("SLE contribution (cm)")
+    fig.savefig(out_filename, bbox_inches="tight")
+
+
+def plot_prognostic_uaf(out_filename, df):
+
+    xmin = np.floor(df[df["Time"] == 2100]["SLE (cm)"].min())
+    xmax = np.ceil(df[df["Time"] == 2100]["SLE (cm)"].max())
+
+    is_df = df
+    is_df["Is_UAF"] = False
+    is_df.loc[is_df["Group"] == "UAF", "Is_UAF"] = True
+
+    fig, ax = plt.subplots(1, 2, sharey="col", figsize=[6.2, 2.0], gridspec_kw=dict(width_ratios=[20, 1]))
+    fig.subplots_adjust(wspace=0.025)
+
+    def plot_signal(g):
+        if g[-1]["Meet_Threshold"].any() == True:
+            signal_color = "#bdd7e7"
+        else:
+            signal_color = "0.5"
+
+        return ax[0].plot(g[-1]["Time"], g[-1]["SLE (cm)"], color=signal_color, linewidth=0.5)
+
+    [plot_signal(g) for g in is_df.groupby(by=["Group", "Model", "Exp"])]
+
+    sns.boxplot(
+        data=is_df[is_df["Time"] == 2100],
+        x="Is_UAF",
+        y="SLE (cm)",
+        hue="Is_UAF",
+        palette=["0.5", "#bdd7e7"],
         width=0.8,
         linewidth=0.75,
         fliersize=0.40,
@@ -373,5 +422,6 @@ for d, data in domain.items():
     )
     model_trends = model_trends.astype({"Group": str, "Model": str, "Exp": str, "Trend (Gt/yr)": float})
     model_trends = model_trends.groupby(by=["Group", "Model"]).mean().reset_index()
-    # plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
+    plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
     plot_prognostic(f"{d}_prognostic.pdf", df)
+    plot_prognostic_uaf(f"{d}_prognostic_uaf.pdf", df)
