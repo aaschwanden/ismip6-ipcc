@@ -1,4 +1,4 @@
-#!bin/bash
+#!/bin/bash
 
 file=v7_CMIP5_pub.zip
 # Download ISMIP6 scalars
