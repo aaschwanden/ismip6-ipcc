@@ -105,7 +105,11 @@ def set_size(w, h, ax=None):
 
 
 def plot_prognostic(out_filename, df):
+    """
+    Plot model projections
+    """
 
+    # min/max for binning and setting the axis bounds
     xmin = np.floor(df[df["Time"] == 2100]["SLE (cm)"].min())
     xmax = np.ceil(df[df["Time"] == 2100]["SLE (cm)"].max())
 
@@ -124,7 +128,10 @@ def plot_prognostic(out_filename, df):
 
         return ax[0].plot(g[-1]["Time"], g[-1]["SLE (cm)"], color=signal_color, linewidth=0.5)
 
+    # Plot each model response by grouping
     [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
+
+    ## Historgram plots
     # sns.histplot(
     #     f_df,
     #     y="SLE (cm)",
@@ -154,6 +161,8 @@ def plot_prognostic(out_filename, df):
     #     legend=False,
     #     ax=ax[1],
     # )
+
+    ## Boxplot
     sns.boxplot(
         data=df[df["Time"] == 2100],
         x="Meet_Threshold",
@@ -183,6 +192,9 @@ def plot_prognostic(out_filename, df):
 
 
 def plot_prognostic_uaf(out_filename, df):
+    """
+    As above, but single out UAF
+    """
 
     xmin = np.floor(df[df["Time"] == 2100]["SLE (cm)"].min())
     xmax = np.ceil(df[df["Time"] == 2100]["SLE (cm)"].max())
@@ -233,6 +245,10 @@ def plot_prognostic_uaf(out_filename, df):
 
 
 def plot_historical(out_filename, df, grace, model_trends):
+    """
+    Plot historical simulations, their trend, along with
+    the GRACE signal and trend.
+    """
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -285,6 +301,7 @@ def plot_historical(out_filename, df, grace, model_trends):
     fig.savefig(out_filename, bbox_inches="tight")
 
 
+# Where the ISMIP6 simulations reside
 basedir = "v7_CMIP5_pub"
 
 ctrl_files = []
@@ -302,21 +319,27 @@ hist_end = 2014
 proj_start = hist_end + 1
 proj_end = 2100
 
-# Ideally, we would get the time axis from the netCDF files, but some contributions have wrong meta data
+# Ideally, we would get the time axis from the netCDF files, but some contributions (UAF!) have wrong meta data
 
 # Historical time differs from model to model
 # Projection time is same for all model
 proj_time = np.arange(proj_start, proj_end + 1)
+
+# tolarance within which we consider the model trend to be "pass" / "ok". This is arbitrary.
 tolerance = 0.25
 
+# Greenland only though this could easily be extended to Antarctica
 domain = {"GIS": "greenland_mass_200204_202008.txt"}
 
 for d, data in domain.items():
     print(f"Analyzing {d}")
 
+    # Load the GRACE data
     grace = pd.read_csv(data, header=30, delim_whitespace=True, skipinitialspace=True, names=["Time", "Mass", "Sigma"])
+    # Normalize GRACE signal to the starting date of the projection
     grace["Mass"] -= np.interp(proj_start, grace["Time"], grace.Mass)
 
+    # Get the GRACE trend
     grace_hist_df = grace[(grace["Time"] >= hist_start) & (grace["Time"] <= proj_start)]
     x = grace_hist_df["Time"]
     y = grace_hist_df["Mass"][(grace["Time"] > hist_start) & (grace["Time"] <= proj_start)]
@@ -324,6 +347,8 @@ for d, data in domain.items():
     grace_bias = p[0]
     grace_trend = p[1]
 
+    # Now read the ISMIP6 files. The information we need is in the file names, not the metadate
+    # so this is no fun.
     dfs = []
     for path in Path(basedir).rglob("*_mm_cr_*.nc"):
         files.append(path)
@@ -334,12 +359,14 @@ for d, data in domain.items():
         exp_mass = nc.variables["limgr"][:] / 1e12
 
         f = path.name.split(f"scalars_mm_cr_{d}_")[-1].split(".nc")[0].split("_")
+        # This is ugly, because of "ITLS_PIK"
         if len(f) == 3:
             group, model, exp = f
         else:
             g1, g2, model, exp = f
             group = f"{g1}_{g2}"
 
+        # Find the coressponding CTRL Historical simulations
         ctrl_file = [m for m in ctrl_files if (f"{group}_{model}" in m.name)][0]
         hist_file = [m for m in hist_files if (f"{group}_{model}" in m.name)][0]
 
@@ -355,11 +382,15 @@ for d, data in domain.items():
         hist_sle = nc_hist.variables["sle"][:-1] - nc_hist.variables["sle"][-1]
         hist_mass = (nc_hist.variables["limgr"][:-1] - nc_hist.variables["limgr"][-1]) / 1e12
 
-        # We need to add the CTRL run to all simulations
+        # We need to add the CTRL run to all projections
         proj_sle = exp_sle + ctrl_sle
         proj_mass = exp_mass + ctrl_mass
 
+        # Historical simulations start at different years since initialization was left
+        # up to the modelers
         hist_time = -np.arange(len(hist_sle))[::-1] + hist_end
+
+        # Let's add the data to the main DataFrame
         m_time = np.hstack((hist_time, proj_time))
         m_sle = -np.hstack((hist_sle, proj_sle)) * 100
         m_mass = np.hstack((hist_mass, proj_mass))
@@ -379,9 +410,12 @@ for d, data in domain.items():
                 columns=["Time", "SLE (cm)", "Mass (Gt)", "Group", "Model", "Exp"],
             )
         )
+
+    # Concatenate all DataFrames and convert object types
     df = pd.concat(dfs)
     df = df.astype({"Time": float, "SLE (cm)": float, "Mass (Gt)": float, "Model": str, "Exp": str})
 
+    # Add a boolean whether the Model is within the trend tolerance
     pass_dfs = []
     fail_dfs = []
     groups = []
@@ -422,6 +456,7 @@ for d, data in domain.items():
     )
     model_trends = model_trends.astype({"Group": str, "Model": str, "Exp": str, "Trend (Gt/yr)": float})
     model_trends = model_trends.groupby(by=["Group", "Model"]).mean().reset_index()
+
     plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
     plot_prognostic(f"{d}_prognostic.pdf", df)
     plot_prognostic_uaf(f"{d}_prognostic_uaf.pdf", df)
