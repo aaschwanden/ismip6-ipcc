@@ -89,6 +89,7 @@ def trend_estimator(x, y):
 
     return optimize.leastsq(errfunc, p0[:], args=(x, y), full_output=1)
 
+#%% End of trend_estimator, start of plotting functions
 
 def set_size(w, h, ax=None):
     """ w, h: width, height in inches """
@@ -117,7 +118,9 @@ def plot_prognostic(out_filename, df):
     p_df = df[(df["Time"] == 2100) & (df["Meet_Threshold"] == True)]
     f_df = df[(df["Time"] == 2100) & (df["Meet_Threshold"] == False)]
 
-    fig, ax = plt.subplots(1, 2, sharey="col", figsize=[6.2, 2.0], gridspec_kw=dict(width_ratios=[20, 1]))
+    fig, ax = plt.subplots(1, 2, sharey="col", figsize=[6.2, 2.0], 
+                           num='prognostic_all', clear=True,
+                           gridspec_kw=dict(width_ratios=[20, 1]))
     fig.subplots_adjust(wspace=0.025)
 
     def plot_signal(g):
@@ -203,7 +206,9 @@ def plot_prognostic_uaf(out_filename, df):
     is_df["Is_UAF"] = False
     is_df.loc[is_df["Group"] == "UAF", "Is_UAF"] = True
 
-    fig, ax = plt.subplots(1, 2, sharey="col", figsize=[6.2, 2.0], gridspec_kw=dict(width_ratios=[20, 1]))
+    fig, ax = plt.subplots(1, 2, sharey="col", figsize=[6.2, 2.0], 
+                           num='prognostic_uaf', clear=True,
+                           gridspec_kw=dict(width_ratios=[20, 1]))
     fig.subplots_adjust(wspace=0.025)
 
     def plot_signal(g):
@@ -250,10 +255,13 @@ def plot_historical(out_filename, df, grace, model_trends):
     the GRACE signal and trend.
     """
 
-    fig = plt.figure()
+    fig = plt.figure(num='historical', clear=True)
     ax = fig.add_subplot(111)
 
     def plot_signal(g):
+        # plt.pause(0.1)
+        # ax.set_title(str(g[0]))
+        # input(str(g[0]) + "  press")
         m_df = g[-1]
         x = m_df["Time"]
         y = m_df["Mass (Gt)"]
@@ -262,7 +270,9 @@ def plot_historical(out_filename, df, grace, model_trends):
         else:
             signal_color = "0.75"
 
-        return ax.plot(x, y, color=signal_color, linewidth=0.5)
+        return ax.plot(x, y, 
+                       color=signal_color, 
+                       linewidth=0.5)
 
     def plot_trend(model_trend):
         if np.abs(1 - model_trend / grace_trend) < tolerance:
@@ -277,9 +287,8 @@ def plot_historical(out_filename, df, grace, model_trends):
             linewidth=0.75,
         )
 
-    [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
-    [plot_trend(row[-1]["Trend (Gt/yr)"]) for row in model_trends.iterrows()]
 
+    # Plot GRACE
     ax.fill_between(
         grace["Time"], grace["Mass"] - 2 * grace["Sigma"], grace["Mass"] + 2 * grace["Sigma"], color="#9ecae1"
     )
@@ -289,17 +298,25 @@ def plot_historical(out_filename, df, grace, model_trends):
         [grace_bias + grace_trend * hist_start, 0],
         color="#2171b5",
         linewidth=1.0,
+        label='GRACE mass changes',
     )
 
+    plt.legend()
     set_size(6, 2)
 
     ax.set_xlabel("Year")
-    ax.set_ylabel("Cumulative mass change since 2015 (Gt)")
+    ax.set_ylabel("Cumulative mass change\nsince 2015 (Gt)")
 
-    ax.set_xlim(left=2006, right=2020)
+    ax.set_xlim(left=2001, right=2021)
     ax.set_ylim(-2000, 4000)
+    
+    [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
+    [plot_trend(row[-1]["Trend (Gt/yr)"]) for row in model_trends.iterrows()]
+    
+    
     fig.savefig(out_filename, bbox_inches="tight")
 
+#%% End of plotting function definitions, start of analysis
 
 # Where the ISMIP6 simulations reside
 basedir = "v7_CMIP5_pub"
@@ -347,8 +364,12 @@ for d, data in domain.items():
     grace_bias = p[0]
     grace_trend = p[1]
 
-    # Now read the ISMIP6 files. The information we need is in the file names, not the metadate
-    # so this is no fun.
+
+    # Now read model output from each of the ISMIP6 files. The information we 
+    # need is in the file names, not the metadate so this is no fun.
+        # Approach is to read each dataset into a dataframe, then concatenate all
+        #   dataframes into one Arch dataframe that contains all model runs.
+        # Resulting dataframe consists of both historical and projected changes
     dfs = []
     for path in Path(basedir).rglob("*_mm_cr_*.nc"):
         files.append(path)
@@ -394,6 +415,7 @@ for d, data in domain.items():
         m_time = np.hstack((hist_time, proj_time))
         m_sle = -np.hstack((hist_sle, proj_sle)) * 100
         m_mass = np.hstack((hist_mass, proj_mass))
+        
         n = len(m_time)
         dfs.append(
             pd.DataFrame(
