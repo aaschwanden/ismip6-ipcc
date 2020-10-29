@@ -282,7 +282,8 @@ def plot_historical(out_filename, df, grace, model_trends):
 
         return ax.plot(
             [hist_start, proj_start],
-            [model_trend * (hist_start - proj_start), 0],
+            # [model_trend * (hist_start - proj_start), 0],
+            [0, -model_trend * (hist_start - proj_start)], # zero at hist_start
             color=trend_color,
             linewidth=0.75,
         )
@@ -295,7 +296,8 @@ def plot_historical(out_filename, df, grace, model_trends):
     ax.plot(grace["Time"], grace["Mass"], ":", color="#3182bd", linewidth=0.5)
     (l_g,) = ax.plot(
         [hist_start, proj_start],
-        [grace_bias + grace_trend * hist_start, 0],
+        # [grace_bias + grace_trend * hist_start, 0], 
+        [0, grace_bias + grace_trend * proj_start], # zero at hist_start
         color="#2171b5",
         linewidth=1.0,
         label='GRACE mass changes',
@@ -305,7 +307,8 @@ def plot_historical(out_filename, df, grace, model_trends):
     set_size(6, 2)
 
     ax.set_xlabel("Year")
-    ax.set_ylabel("Cumulative mass change\nsince 2015 (Gt)")
+    # ax.set_ylabel("Cumulative mass change\nsince 2015 (Gt)")
+    ax.set_ylabel("Cumulative mass change\nsince 2007 (Gt)")
 
     ax.set_xlim(left=2001, right=2021)
     ax.set_ylim(-2000, 4000)
@@ -314,6 +317,31 @@ def plot_historical(out_filename, df, grace, model_trends):
     [plot_trend(row[-1]["Trend (Gt/yr)"]) for row in model_trends.iterrows()]
     
     
+    fig.savefig(out_filename, bbox_inches="tight")
+
+def plot_trends(out_filename, df):
+    """
+    Create plot of the historical trends of models vs. GRACE
+    """
+
+    fig, ax = plt.subplots(num='trend_plot', clear=True)    
+    # sns.kdeplot(data=model_trends['Trend (Gt/yr)'])
+    sns.histplot(data=model_trends, x='Trend (Gt/yr)', bins=np.arange(-350, 300, 50),
+                 ax=ax, label='Model trend')
+    sns.rugplot(data=model_trends['Trend (Gt/yr)'], ax=ax)
+    sns.rugplot(data=[grace_trend], ax=ax)
+    ax.set_xlabel('2007-2015 Mass Loss Trend (Gt/yr)')
+    fig.legend(bbox_to_anchor=(0.65, .77, .01, .01), loc='lower left')
+    
+    ax.annotate('GRACE trend',
+            xy=(grace_trend, 0.5), xycoords='data',
+            xytext=(grace_trend, 4.7), textcoords='data',
+            arrowprops=dict(arrowstyle='fancy', facecolor='C1', edgecolor='none',
+                            mutation_scale=25),
+            bbox=dict(fc='1', edgecolor='none'),
+            horizontalalignment='center', verticalalignment='top', fontsize=12
+            )
+
     fig.savefig(out_filename, bbox_inches="tight")
 
 #%% End of plotting function definitions, start of analysis
@@ -353,8 +381,10 @@ for d, data in domain.items():
 
     # Load the GRACE data
     grace = pd.read_csv(data, header=30, delim_whitespace=True, skipinitialspace=True, names=["Time", "Mass", "Sigma"])
-    # Normalize GRACE signal to the starting date of the projection
-    grace["Mass"] -= np.interp(proj_start, grace["Time"], grace.Mass)
+    # # Normalize GRACE signal to the starting date of the projection
+    # grace["Mass"] -= np.interp(proj_start, grace["Time"], grace.Mass)
+    # Normalize GRACE signal to the starting date of the historical period
+    grace["Mass"] -= np.interp(hist_start, grace["Time"], grace.Mass)
 
     # Get the GRACE trend
     grace_hist_df = grace[(grace["Time"] >= hist_start) & (grace["Time"] <= proj_start)]
@@ -363,6 +393,8 @@ for d, data in domain.items():
     p = trend_estimator(x, y)[0]
     grace_bias = p[0]
     grace_trend = p[1]
+    # # re-standardize baseline mass change to be zero at hist_start
+    # grace["Mass"] += grace_trend * (proj_start - hist_start)
 
 
     # Now read model output from each of the ISMIP6 files. The information we 
@@ -416,6 +448,27 @@ for d, data in domain.items():
         m_sle = -np.hstack((hist_sle, proj_sle)) * 100
         m_mass = np.hstack((hist_mass, proj_mass))
         
+        # Change baseline for mass changes to 2007, hist_start
+        try:
+            i_hist_start = np.where(m_time == hist_start)[0][0]
+            m_sle -= m_sle[i_hist_start] 
+            m_mass -= m_mass[i_hist_start] 
+        except IndexError: #For the UAF simulations which start in 2008
+            # Do linear extrapolation of the UAF trends back to 2007.
+            hist_inds = (m_time>=hist_start) & (m_time<=proj_start)
+            p = trend_estimator(m_time[hist_inds], m_mass[hist_inds])[0]
+            model_bias = p[0]
+            model_trend = p[1]
+            mass_offset = model_trend * (proj_start - hist_start)
+            m_mass += mass_offset 
+
+            p = trend_estimator(m_time[hist_inds], m_sle[hist_inds])[0]
+            model_bias = p[0]
+            model_trend = p[1]
+            sle_offset = model_trend * (proj_start - hist_start)
+            m_sle += sle_offset 
+
+        
         n = len(m_time)
         dfs.append(
             pd.DataFrame(
@@ -432,7 +485,8 @@ for d, data in domain.items():
                 columns=["Time", "SLE (cm)", "Mass (Gt)", "Group", "Model", "Exp"],
             )
         )
-
+        # End of working with each model run individually (the path for-loop)
+        
     # Concatenate all DataFrames and convert object types
     df = pd.concat(dfs)
     df = df.astype({"Time": float, "SLE (cm)": float, "Mass (Gt)": float, "Model": str, "Exp": str})
@@ -482,3 +536,4 @@ for d, data in domain.items():
     plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
     plot_prognostic(f"{d}_prognostic.pdf", df)
     plot_prognostic_uaf(f"{d}_prognostic_uaf.pdf", df)
+    plot_trends(f"{d}_trends.pdf", df)
