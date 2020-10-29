@@ -293,28 +293,35 @@ def plot_historical(out_filename, df, grace, model_trends):
     ax.fill_between(
         grace["Time"], grace["Mass"] - 2 * grace["Sigma"], grace["Mass"] + 2 * grace["Sigma"], color="#9ecae1"
     )
-    ax.plot(grace["Time"], grace["Mass"], ":", color="#3182bd", linewidth=0.5)
-    (l_g,) = ax.plot(
-        [hist_start, proj_start],
-        # [grace_bias + grace_trend * hist_start, 0], 
-        [0, grace_bias + grace_trend * proj_start], # zero at hist_start
-        color="#2171b5",
-        linewidth=1.0,
-        label='GRACE mass changes',
-    )
-
-    plt.legend()
+    grace_line = ax.plot(grace["Time"], grace["Mass"], '-',#":",
+            color="#3182bd", linewidth=1, label='GRACE mass changes')
+    # (l_g,) = ax.plot( # GRACE trend
+    #     [hist_start, proj_start],
+    #     # [grace_bias + grace_trend * hist_start, 0], 
+    #     [0, grace_bias + grace_trend * proj_start], # zero at hist_start
+    #     color="#2171b5",
+    #     linewidth=1.0,
+    # )
+    
+    # For eventual sophisticated legend manipulation
+    import matplotlib.lines as mlines
+    good_models = mlines.Line2D([], [], color="#74c476", linewidth = 0.5,
+                               label='Model trends within 25% of GRACE')
+    all_models = mlines.Line2D([], [], color="0.75", linewidth = 0.5,
+                               label='Other model trends')
+    plt.legend(handles=[grace_line[0], good_models, all_models])
+    # plt.legend(loc='lower left')
     set_size(6, 2)
 
     ax.set_xlabel("Year")
     # ax.set_ylabel("Cumulative mass change\nsince 2015 (Gt)")
     ax.set_ylabel("Cumulative mass change\nsince 2007 (Gt)")
 
-    ax.set_xlim(left=2001, right=2021)
-    ax.set_ylim(-2000, 4000)
+    ax.set_xlim(left=2000, right=2030)
+    ax.set_ylim(-6000, 2000)
     
     [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
-    [plot_trend(row[-1]["Trend (Gt/yr)"]) for row in model_trends.iterrows()]
+    # [plot_trend(row[-1]["Trend (Gt/yr)"]) for row in model_trends.iterrows()]
     
     
     fig.savefig(out_filename, bbox_inches="tight")
