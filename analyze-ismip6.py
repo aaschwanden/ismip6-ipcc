@@ -194,6 +194,112 @@ def plot_prognostic(out_filename, df):
     fig.savefig(out_filename, bbox_inches="tight")
 
 
+def plot_prognostic_w_scaling(out_filename, df, model_trends, grace_trend):
+    """
+    Plot model projections with corrections
+    """
+    #%%
+    model_trends['trend_scalar'] = grace_trend / model_trends['Trend (Gt/yr)']
+    super_df = pd.merge(df, model_trends)
+    super_df['scaled_SLE'] = super_df['SLE (cm)'] * super_df['trend_scalar']
+
+    # min/max for binning and setting the axis bounds
+    ymin = -10#np.floor(df[df["Time"] == 2100]["SLE (cm)"].min())
+    ymax = 40#np.ceil(df[df["Time"] == 2100]["SLE (cm)"].max())
+
+    # Dataframe with Year 2100 only for histogram
+    p_df = df[(df["Time"] == 2100) & (df["Meet_Threshold"] == True)]
+    f_df = df[(df["Time"] == 2100) & (df["Meet_Threshold"] == False)]
+    bp_super_df = super_df[(super_df["Time"] == 2100)]
+
+    fig, ax = plt.subplots(2, 2, sharey="col",  figsize=[6.2, 4.0], 
+                           num='prognostic_all_scaled', clear=True,
+                           gridspec_kw=dict(width_ratios=[20, 1]))
+    fig.subplots_adjust(wspace=0.025)
+
+    def plot_signal(g):
+        if g[-1]["Meet_Threshold"].any() == True:
+            signal_color = "#74c476"
+        else:
+            signal_color = "0.5"
+        # ax[1,0].set_xlim(2007, 2020)
+        # ax[1,0].set_ylim(-2, 2)
+        # plt.pause(0.1)
+        return ax[0, 0].plot(g[-1]["Time"], g[-1]["SLE (cm)"], color=signal_color, linewidth=0.5)
+
+    def plot_signal_scaled(g):
+        if g[-1]["Meet_Threshold"].any() == True:
+            signal_color = "#74c476"
+        else:
+            signal_color = "0.5"
+        # ax[1,0].set_xlim(2007, 2020)
+        # ax[1,0].set_ylim(-2, 2)
+        # plt.pause(0.1)
+        
+        # print('good')
+        # if g[-1]["Time"].any() == 1995.0:
+        #     return
+        
+        return ax[1, 0].plot(g[-1]["Time"], g[-1]["scaled_SLE"], color=signal_color, linewidth=0.5)
+
+
+    # Plot each model response by grouping
+    [plot_signal_scaled(g) for g in super_df.groupby(by=["Group", "Model", "Exp"])]
+    [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
+
+    ## Boxplot
+    sns.boxplot(
+        data=super_df[super_df["Time"] == 2100],
+        x="Meet_Threshold",
+        y="scaled_SLE",
+        hue="Meet_Threshold",
+        palette=["0.5", "#238b45"],
+        width=0.8,
+        linewidth=0.75,
+        fliersize=0.40,
+        ax=ax[1, 1],
+    )
+    sns.despine(ax=ax[1,1], left=True, bottom=True)
+    try:
+        ax[1,1].get_legend().remove()
+    except:
+        pass
+    
+    ## Boxplot
+    sns.boxplot(
+        data=df[df["Time"] == 2100],
+        x="Meet_Threshold",
+        y="SLE (cm)",
+        hue="Meet_Threshold",
+        palette=["0.5", "#238b45"],
+        width=0.8,
+        linewidth=0.75,
+        fliersize=0.40,
+        ax=ax[0, 1],
+    )
+    sns.despine(ax=ax[0,1], left=True, bottom=True)
+    try:
+        ax[0,1].get_legend().remove()
+    except:
+        pass
+    
+    [ax.tick_params('x', top=True) for ax in ax[:,0]]
+    [ax.tick_params('y', right=True) for ax in ax[:,0]]
+    [ax.set_ylim(ymin, ymax) for ax in ax[:,0]]
+    [ax.set_ylim(ymin, ymax) for ax in ax[:,1]]
+    # [ax.set_xlim(hist_start, proj_end) for ax in ax[:,0]]
+    [ax.set_xlim(hist_start, 2100) for ax in ax[:,0]]
+    [ax.set_xlabel(None) for ax in ax[:,1]]
+    [ax.set_ylabel(None) for ax in ax[:,1]]
+    ax[0,0].set_xticklabels('')
+    [ax.axes.xaxis.set_visible(False) for ax in ax[:,1]]
+    [ax.axes.yaxis.set_visible(False) for ax in ax[:,1]]
+    ax[1,0].set_xlabel("Year")
+    [ax.set_ylabel("SLE contribution (cm)") for ax in ax[:,0]]
+#%%
+    fig.savefig(out_filename, bbox_inches="tight")
+
+
 def plot_prognostic_uaf(out_filename, df):
     """
     As above, but single out UAF
@@ -340,14 +446,23 @@ def plot_trends(out_filename, df):
     ax.set_xlabel('2007-2015 Mass Loss Trend (Gt/yr)')
     fig.legend(bbox_to_anchor=(0.65, .77, .01, .01), loc='lower left')
     
-    ax.annotate('GRACE trend',
-            xy=(grace_trend, 0.5), xycoords='data',
-            xytext=(grace_trend, 4.7), textcoords='data',
-            arrowprops=dict(arrowstyle='fancy', facecolor='C1', edgecolor='none',
-                            mutation_scale=25),
-            bbox=dict(fc='1', edgecolor='none'),
-            horizontalalignment='center', verticalalignment='top', fontsize=12
-            )
+    ax.set_xlim(-400,300)
+    ax.set_ylim(0,6.8)
+
+    # Plot dashed line for GRACE
+    ax.plot([grace_trend, grace_trend], [0, 6.8], '--', color='C1', 
+            linewidth=3)
+    ax.text(-330, 2.8, 'Observed GRACE trend', rotation=90, fontsize=12)
+    
+    # # Plot arrow for GRACE
+    # ax.annotate('GRACE trend',
+    #         xy=(grace_trend, 0.5), xycoords='data',
+    #         xytext=(grace_trend, 4.7), textcoords='data',
+    #         arrowprops=dict(arrowstyle='fancy', facecolor='C1', edgecolor='none',
+    #                         mutation_scale=25),
+    #         bbox=dict(fc='1', edgecolor='none'),
+    #         horizontalalignment='center', verticalalignment='top', fontsize=12
+    #         )
 
     fig.savefig(out_filename, bbox_inches="tight")
 
@@ -544,3 +659,4 @@ for d, data in domain.items():
     plot_prognostic(f"{d}_prognostic.pdf", df)
     plot_prognostic_uaf(f"{d}_prognostic_uaf.pdf", df)
     plot_trends(f"{d}_trends.pdf", df)
+    plot_prognostic_w_scaling(f"{d}_prognostic_scaled.pdf", df, model_trends, grace_trend)
