@@ -212,7 +212,7 @@ def plot_prognostic_w_scaling(out_filename, df, model_trends, grace_trend):
     f_df = df[(df["Time"] == 2100) & (df["Meet_Threshold"] == False)]
     bp_super_df = super_df[(super_df["Time"] == 2100)]
 
-    fig, ax = plt.subplots(2, 2, sharey="col",  figsize=[6.2, 4.0], 
+    fig, ax = plt.subplots(2, 2, sharey="col",  figsize=[9.4, 5.5], 
                            num='prognostic_all_scaled', clear=True,
                            gridspec_kw=dict(width_ratios=[20, 1]))
     fig.subplots_adjust(wspace=0.025)
@@ -400,12 +400,17 @@ def plot_historical(out_filename, df, grace, model_trends):
         )
 
 
-    # Plot GRACE
+    # Plot GRACE and model results
     ax.fill_between(
         grace["Time"], grace["Mass"] - 2 * grace["Sigma"], grace["Mass"] + 2 * grace["Sigma"], color="#9ecae1"
     )
+    
+    [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
+    # [plot_trend(row[-1]["Trend (Gt/yr)"]) for row in model_trends.iterrows()]
+    
     grace_line = ax.plot(grace["Time"], grace["Mass"], '-',#":",
             color="#3182bd", linewidth=1, label='GRACE mass changes')
+    
     # (l_g,) = ax.plot( # GRACE trend
     #     [hist_start, proj_start],
     #     # [grace_bias + grace_trend * hist_start, 0], 
@@ -431,8 +436,6 @@ def plot_historical(out_filename, df, grace, model_trends):
     ax.set_xlim(left=2000, right=2030)
     ax.set_ylim(-6000, 2000)
     
-    [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
-    # [plot_trend(row[-1]["Trend (Gt/yr)"]) for row in model_trends.iterrows()]
     
     
     fig.savefig(out_filename, bbox_inches="tight")
@@ -441,21 +444,32 @@ def plot_trends(out_filename, df):
     """
     Create plot of the historical trends of models vs. GRACE
     """
-
+    
     fig, ax = plt.subplots(num='trend_plot', clear=True)    
     # sns.kdeplot(data=model_trends['Trend (Gt/yr)'])
-    sns.histplot(data=model_trends, x='Trend (Gt/yr)', bins=np.arange(-350, 300, 50),
-                 ax=ax, label='Model trend')
-    sns.rugplot(data=model_trends['Trend (Gt/yr)'], ax=ax)
-    sns.rugplot(data=[grace_trend], ax=ax)
+    sns.histplot(data=model_trends, 
+                 x='Trend (Gt/yr)', 
+                 hue="Meet_Threshold",
+                 palette=["0.5", "#238b45"],
+                 bins=np.arange(-350, 300, 50),
+                 ax=ax, label='Model trend',
+                 )
+    sns.rugplot(data=model_trends,
+                x='Trend (Gt/yr)', 
+                hue="Meet_Threshold",
+                palette=["0.5", "#238b45"],
+                ax=ax,
+                legend=False,
+                )
+    # sns.rugplot(data=[grace_trend], ax=ax)
     ax.set_xlabel('2007-2015 Mass Loss Trend (Gt/yr)')
-    fig.legend(bbox_to_anchor=(0.65, .77, .01, .01), loc='lower left')
+    # fig.legend(bbox_to_anchor=(0.65, .77, .01, .01), loc='lower left')
     
     ax.set_xlim(-400,300)
     ax.set_ylim(0,6.8)
 
     # Plot dashed line for GRACE
-    ax.plot([grace_trend, grace_trend], [0, 6.8], '--', color='C1', 
+    ax.plot([grace_trend, grace_trend], [0, 6.8], '--', color="#3182bd", 
             linewidth=3)
     ax.text(-330, 2.8, 'Observed GRACE trend', rotation=90, fontsize=12)
     
@@ -625,6 +639,7 @@ for d, data in domain.items():
     models = []
     exps = []
     trends = []
+    # meet_thresh = []
     for g in df.groupby(by=["Group", "Model", "Exp"]):
         m_df = g[-1][(g[-1]["Time"] >= hist_start) & (g[-1]["Time"] <= proj_start)]
         x = m_df["Time"]
@@ -636,7 +651,7 @@ for d, data in domain.items():
         models.append(g[0][1])
         exps.append(g[0][2])
         trends.append(model_trend)
-
+        # meet_thresh.append(np.abs(1 - model_trend / grace_trend) <= tolerance)
         if np.abs(1 - model_trend / grace_trend) <= tolerance:
             pass_dfs.append(g[-1])
         else:
@@ -653,12 +668,14 @@ for d, data in domain.items():
                 np.array(models).reshape(-1, 1),
                 np.array(exps).reshape(-1, 1),
                 np.array(trends).reshape(-1, 1),
+                # np.array(meet_thresh).reshape(-1, 1),
             ]
         ),
-        columns=["Group", "Model", "Exp", "Trend (Gt/yr)"],
+        columns=["Group", "Model", "Exp", "Trend (Gt/yr)"],# "Meet_Threshold"],
     )
     model_trends = model_trends.astype({"Group": str, "Model": str, "Exp": str, "Trend (Gt/yr)": float})
-    model_trends = model_trends.groupby(by=["Group", "Model"]).mean().reset_index()
+    model_trends = model_trends.groupby(by=["Group", "Model"]).mean(numeric_only=False).reset_index()
+    model_trends["Meet_Threshold"] = np.abs(1 - model_trends["Trend (Gt/yr)"] / grace_trend) <= tolerance
 
     plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
     plot_prognostic(f"{d}_prognostic.pdf", df)
