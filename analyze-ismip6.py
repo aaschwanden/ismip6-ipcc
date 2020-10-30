@@ -198,7 +198,7 @@ def plot_prognostic_w_scaling(out_filename, df, model_trends, grace_trend):
     """
     Plot model projections with corrections
     """
-    #%%
+    
     model_trends['trend_scalar'] = grace_trend / model_trends['Trend (Gt/yr)']
     super_df = pd.merge(df, model_trends)
     super_df['scaled_SLE'] = super_df['SLE (cm)'] * super_df['trend_scalar']
@@ -283,6 +283,11 @@ def plot_prognostic_w_scaling(out_filename, df, model_trends, grace_trend):
     except:
         pass
     
+    ax[0,0].text(2012, 30, 'Goelzer et al., 2020, ISMIP6 projections', 
+                 fontsize=12)
+    ax[1,0].text(2012, 30, 'Projections linearly scaled to match 2007-2015 GRACE observations',
+                 fontsize=12)
+    
     [ax.tick_params('x', top=True) for ax in ax[:,0]]
     [ax.tick_params('y', right=True) for ax in ax[:,0]]
     [ax.set_ylim(ymin, ymax) for ax in ax[:,0]]
@@ -296,7 +301,7 @@ def plot_prognostic_w_scaling(out_filename, df, model_trends, grace_trend):
     [ax.axes.yaxis.set_visible(False) for ax in ax[:,1]]
     ax[1,0].set_xlabel("Year")
     [ax.set_ylabel("SLE contribution (cm)") for ax in ax[:,0]]
-#%%
+
     fig.savefig(out_filename, bbox_inches="tight")
 
 
