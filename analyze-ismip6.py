@@ -658,8 +658,11 @@ for d, data in domain.items():
             fail_dfs.append(g[-1])
     fail_df = pd.concat(fail_dfs)
     fail_df["Meet_Threshold"] = False
-    pass_df = pd.concat(pass_dfs)
-    pass_df["Meet_Threshold"] = True
+    if len(pass_dfs) == 0: # in case no models pass the threshold...
+        pass_df = pd.DataFrame()
+    else:
+        pass_df = pd.concat(pass_dfs)
+        pass_df["Meet_Threshold"] = True
     df = pd.concat([fail_df, pass_df])
     model_trends = pd.DataFrame(
         data=np.hstack(
