@@ -676,6 +676,11 @@ for d, data in domain.items():
     model_trends = model_trends.astype({"Group": str, "Model": str, "Exp": str, "Trend (Gt/yr)": float})
     model_trends = model_trends.groupby(by=["Group", "Model"]).mean(numeric_only=False).reset_index()
     model_trends["Meet_Threshold"] = np.abs(1 - model_trends["Trend (Gt/yr)"] / grace_trend) <= tolerance
+    # Create unique ID columen Group-Model
+    model_trends['Group-Model'] = model_trends['Group'] + '-' + model_trends['Model']
+    
+    final = df[df["Time"]==2100]
+    final['Group-Model'] = final['Group'] + '-' + final['Model']
 
     plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
     plot_prognostic(f"{d}_prognostic.pdf", df)
