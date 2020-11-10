@@ -676,12 +676,36 @@ for d, data in domain.items():
     model_trends = model_trends.astype({"Group": str, "Model": str, "Exp": str, "Trend (Gt/yr)": float})
     model_trends = model_trends.groupby(by=["Group", "Model"]).mean(numeric_only=False).reset_index()
     model_trends["Meet_Threshold"] = np.abs(1 - model_trends["Trend (Gt/yr)"] / grace_trend) <= tolerance
-    # Create unique ID columen Group-Model
+    # Create unique ID column Group-Model
     model_trends['Group-Model'] = model_trends['Group'] + '-' + model_trends['Model']
     
-    final = df[df["Time"]==2100]
+    # %% Compare historical trend with final outcome of sea level equivalent
+    final = df[df["Time"]==2100].copy()
     final['Group-Model'] = final['Group'] + '-' + final['Model']
+    # Select those experimental results from experiments 05, 06, and 08, 
+    #   which are the RCP8.5 experiments, with medium Slater ocean sensitivity
+    #   and MIROC5, NorESM and HadGEM2-ES GCMs
+    final_rcp85core = final.loc[final['Exp'].isin(['exp05', 'exp06', 'exp08'])].copy()
+    final_rcp85core = final_rcp85core.groupby(['Group-Model']).mean() # Take the mean of the three models
+    final_rcp85core = final_rcp85core.merge(model_trends, on='Group-Model') # Merge the 2100 mass loss with the observed trend
 
+    fig, ax = plt.subplots()#num="SLE v Trend", clear=True)
+    final_rcp85core.plot(x="Trend (Gt/yr)",
+                         y="SLE (cm)",
+                         kind="scatter",
+                         ax=ax,
+                         )
+    ax.set_xlabel(f"{hist_start}-{proj_start} Mass Loss Trend (Gt/yr)")
+    ax.set_ylabel("2100 SLE Mass Loss (cm)")
+    # # Label the scatter plot with the Group-Model names
+    # for i in range(len(final_rcp85core)):
+    #     ax.text(final_rcp85core['Trend (Gt/yr)'].values[i],
+    #             final_rcp85core['SLE (cm)'].values[i],
+    #             final_rcp85core['Group-Model'].values.tolist()[i],
+    #             )
+    # ax.grid('on')
+
+    # %% Build Final Plots
     h_df = df[(df["Time"] >= hist_start) & (df["Time"] <= proj_start)]
     plot_historical_fluxes(f"{d}_fluxes_historical.pdf", h_df)
     plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
