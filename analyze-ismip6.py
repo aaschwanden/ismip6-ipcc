@@ -13,6 +13,19 @@ import seaborn as sns
 from pathlib import Path
 import statsmodels.api as sm
 
+import torch
+import theano as tt
+
+
+class linearRegression(torch.nn.Module):
+    def __init__(self, inputSize, outputSize):
+        super(linearRegression, self).__init__()
+        self.linear = torch.nn.Linear(inputSize, outputSize)
+
+    def forward(self, x):
+        out = self.linear(x)
+        return out
+
 
 def set_size(w, h, ax=None):
     """ w, h: width, height in inches """
@@ -476,6 +489,50 @@ for d, data in domain.items():
     grace_bias = p[0]
     grace_trend = p[1]
 
+    x_train = x.astype(np.float32).values.reshape(-1, 1)
+    y_train = y.astype(np.float32).values.reshape(-1, 1)
+    # # create dummy data for training
+    # x_values = [i for i in range(11)]
+    # x_train = np.array(x_values, dtype=np.float32)
+    # x_train = x_train.reshape(-1, 1)
+
+    # y_values = [2 * i + 1 for i in x_values]
+    # y_train = np.array(y_values, dtype=np.float32)
+    # y_train = y_train.reshape(-1, 1)
+    inputDim = 1  # takes variable 'x'
+    outputDim = 1  # takes variable 'y'
+    learningRate = 0.01
+    epochs = 100
+
+    tols = linearRegression(inputDim, outputDim)
+    criterion = torch.nn.MSELoss()
+    optimizer = torch.optim.SGD(tols.parameters(), lr=learningRate)
+    for epoch in range(epochs):
+        # Converting inputs and labels to Variable
+        if torch.cuda.is_available():
+            inputs = torch.autograd.Variable(torch.from_numpy(x_train).cuda())
+            labels = torch.autograd.Variable(torch.from_numpy(y_train).cuda())
+        else:
+            inputs = torch.autograd.Variable(torch.from_numpy(x_train))
+            labels = torch.autograd.Variable(torch.from_numpy(y_train))
+
+        # Clear gradient buffers because we don't want any gradient from previous epoch to carry forward, dont want to cummulate gradients
+        optimizer.zero_grad()
+
+        # get output from the model, given the inputs
+        outputs = tols(inputs)
+
+        # get loss for the predicted output
+        loss = criterion(outputs, labels)
+        print(loss)
+        # get gradients w.r.t to parameters
+        loss.backward()
+
+        # update parameters
+        optimizer.step()
+
+        print("epoch {}, loss {}".format(epoch, loss.item()))
+
     # # re-standardize baseline mass change to be zero at hist_start
     # grace["Mass (Gt)"] += grace_trend * (proj_start - hist_start)
 
@@ -603,7 +660,7 @@ for d, data in domain.items():
             fail_dfs.append(g[-1])
     fail_df = pd.concat(fail_dfs)
     fail_df["Meet_Threshold"] = False
-    if len(pass_dfs) == 0: # in case no models pass the threshold...
+    if len(pass_dfs) == 0:  # in case no models pass the threshold...
         pass_df = pd.DataFrame()
     else:
         pass_df = pd.concat(pass_dfs)
