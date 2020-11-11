@@ -28,7 +28,7 @@ def set_size(w, h, ax=None):
     ax.figure.set_size_inches(figw, figh)
 
 
-def plot_historical_fluxes(out_filename, df):
+def plot_historical_fluxes(out_filename, df, grace):
     def plot_signal(g):
         if g[-1]["Meet_Threshold"].any() == True:
             signal_color = "#74c476"
@@ -41,7 +41,7 @@ def plot_historical_fluxes(out_filename, df):
             signal_color = "#74c476"
         else:
             signal_color = "0.5"
-        return ax.plot(g[-1]["Time"], g[-1]["SMB (Gt)"], color=signal_color, linewidth=0.5)
+        return ax.plot(g[-1]["Time"], g[-1]["SMB (Gt)"], color=signal_color, linewidth=0.5, linestyle="dotted")
 
     def plot_d(g):
         if g[-1]["Meet_Threshold"].any() == True:
@@ -55,28 +55,35 @@ def plot_historical_fluxes(out_filename, df):
     # Plot each model response by grouping
     [plot_smb(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
     [plot_d(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
-    # [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
-    # [plot_signal(g, "D (Gt/yr)") for g in df.groupby(by=["Group", "Model", "Exp"])]
+    [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
+    grace_line = ax.plot(
+        grace["Time"], grace["Mass (Gt)"], "-", color="#3182bd", linewidth=1, label="GRACE mass changes"  # ":",
+    )
 
-    l_smb = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="solid", label="SMB")
+    l_mb = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="solid", label="MB")
+    l_smb = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="dotted", label="SMB")
     l_d = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="dashed", label="D")
-    legend_1 = ax.legend(handles=[l_smb, l_d], loc="upper left")
+    legend_1 = ax.legend(handles=[l_mb, l_smb, l_d], loc="upper left")
     legend_1.get_frame().set_linewidth(0.0)
     legend_1.get_frame().set_alpha(0.0)
 
     good_models = mlines.Line2D([], [], color="#74c476", linewidth=0.5, label="Model trends within 25% of GRACE")
     all_models = mlines.Line2D([], [], color="0.75", linewidth=0.5, label="Other model trends")
-    legend_2 = ax.legend(handles=[good_models, all_models], loc="lower left")
+    legend_2 = ax.legend(handles=[grace_line[0], good_models, all_models], loc="lower left")
     legend_2.get_frame().set_linewidth(0.0)
     legend_2.get_frame().set_alpha(0.0)
     # Pylab automacially removes first legend when legend is called a second time.
     # Add legend 1 back
     ax.add_artist(legend_1)
 
-    ax.set_xlim(hist_start, proj_start)
     ax.set_xlabel("Year")
     ax.set_ylabel(f"Cumulative mass change\nsince {hist_start} (Gt)")
 
+    ax.set_xlim(hist_start, proj_start)
+    fig.savefig(out_filename, bbox_inches="tight")
+
+    ax.set_xlim(hist_start, proj_start)
+    out_filename = f"{d}_fluxes_historical_2008_2030.pdf"
     fig.savefig(out_filename, bbox_inches="tight")
 
 
@@ -86,8 +93,8 @@ def plot_prognostic(out_filename, df):
     """
 
     # min/max for binning and setting the axis bounds
-    xmin = np.floor(df[df["Time"] == 2100]["SLE (cm)"].min())
-    xmax = np.ceil(df[df["Time"] == 2100]["SLE (cm)"].max())
+    xmin = np.floor(df[df["Time"] >= proj_start]["SLE (cm)"].min())
+    xmax = np.ceil(df[df["Time"] >= proj_start]["SLE (cm)"].max())
 
     # Dataframe with Year 2100 only for histogram
     p_df = df[(df["Time"] == 2100) & (df["Meet_Threshold"] == True)]
@@ -289,67 +296,6 @@ def plot_prognostic_w_scaling(out_filename, df, model_trends, grace_trend):
     fig.savefig(out_filename, bbox_inches="tight")
 
 
-def plot_prognostic_uaf(out_filename, df):
-    """
-    As above, but single out UAF
-    """
-
-    xmin = np.floor(df[df["Time"] == 2100]["SLE (cm)"].min())
-    xmax = np.ceil(df[df["Time"] == 2100]["SLE (cm)"].max())
-
-    is_df = df
-    is_df["Is_UAF"] = False
-    is_df.loc[is_df["Group"] == "UAF", "Is_UAF"] = True
-
-    fig, ax = plt.subplots(
-        1,
-        2,
-        sharey="col",
-        figsize=[6.2, 2.0],
-        num="prognostic_uaf",
-        clear=True,
-        gridspec_kw=dict(width_ratios=[20, 1]),
-    )
-    fig.subplots_adjust(wspace=0.025)
-
-    def plot_signal(g):
-        if g[-1]["Meet_Threshold"].any() == True:
-            signal_color = "#bdd7e7"
-        else:
-            signal_color = "0.5"
-
-        return ax[0].plot(g[-1]["Time"], g[-1]["SLE (cm)"], color=signal_color, linewidth=0.5)
-
-    [plot_signal(g) for g in is_df.groupby(by=["Group", "Model", "Exp"])]
-
-    sns.boxplot(
-        data=is_df[is_df["Time"] == 2100],
-        x="Is_UAF",
-        y="SLE (cm)",
-        hue="Is_UAF",
-        palette=["0.5", "#bdd7e7"],
-        width=0.8,
-        linewidth=0.75,
-        fliersize=0.40,
-        ax=ax[1],
-    )
-    sns.despine(ax=ax[1], left=True, bottom=True)
-    try:
-        ax[1].get_legend().remove()
-    except:
-        pass
-    ax[0].set_ylim(xmin, xmax)
-    ax[1].set_ylim(xmin, xmax)
-    ax[0].set_xlim(proj_start, proj_end)
-    ax[1].set_xlabel(None)
-    ax[1].set_ylabel(None)
-    ax[1].axes.xaxis.set_visible(False)
-    ax[1].axes.yaxis.set_visible(False)
-    ax[0].set_xlabel("Year")
-    ax[0].set_ylabel("SLE contribution (cm)")
-    fig.savefig(out_filename, bbox_inches="tight")
-
-
 def plot_historical(out_filename, df, grace, model_trends):
     """
     Plot historical simulations, their trend, along with
@@ -412,15 +358,14 @@ def plot_historical(out_filename, df, grace, model_trends):
 
     good_models = mlines.Line2D([], [], color="#74c476", linewidth=0.5, label="Model trends within 25% of GRACE")
     all_models = mlines.Line2D([], [], color="0.75", linewidth=0.5, label="Other model trends")
-    plt.legend(handles=[grace_line[0], good_models, all_models])
-    # plt.legend(loc='lower left')
+    plt.legend(handles=[grace_line[0], good_models, all_models], loc="upper right")
     set_size(6, 2)
 
     ax.set_xlabel("Year")
     ax.set_ylabel(f"Cumulative mass change\nsince {hist_start} (Gt)")
 
     ax.set_xlim(left=2000, right=2030)
-    ax.set_ylim(-6000, 2000)
+    ax.set_ylim(-3000, 5000)
 
     fig.savefig(out_filename, bbox_inches="tight")
 
@@ -517,7 +462,7 @@ for d, data in domain.items():
         data, header=30, delim_whitespace=True, skipinitialspace=True, names=["Time", "Mass (Gt)", "Sigma (Gt)"]
     )
     # Normalize GRACE signal to the starting date of the projection
-    grace["Mass (Gt)"] -= np.interp(hist_start, grace["Time"], grace["Mass (Gt)"])
+    grace["Mass (Gt)"] -= np.interp(proj_start, grace["Time"], grace["Mass (Gt)"])
 
     # Get the GRACE trend
     grace_time = (grace["Time"] >= hist_start) & (grace["Time"] <= proj_start)
@@ -571,16 +516,16 @@ for d, data in domain.items():
 
         # Historical
         nc_hist = NC(hist_file)
-        # hist_sle = nc_hist.variables["sle"][:-1] - nc_hist.variables["sle"][-1]
-        # hist_mass = (nc_hist.variables["limgr"][:-1] - nc_hist.variables["limgr"][-1]) / 1e12
-        hist_sle = nc_hist.variables["sle"][:-1]
-        hist_mass = nc_hist.variables["limgr"][:-1] / 1e12
+        hist_sle = nc_hist.variables["sle"][:-1] - nc_hist.variables["sle"][-1]
+        hist_mass = (nc_hist.variables["limgr"][:-1] - nc_hist.variables["limgr"][-1]) / 1e12
         hist_smb = nc_hist.variables["smb"][:-1] / 1e12 * secpera
 
-        # We need to add the CTRL run to all projections
-        proj_sle = exp_sle + ctrl_sle
-        proj_mass = exp_mass + ctrl_mass
-        proj_smb = exp_smb + ctrl_smb
+        # proj_sle = exp_sle + ctrl_sle
+        # proj_mass = exp_mass + ctrl_mass
+        # proj_smb = exp_smb + ctrl_smb
+        proj_sle = exp_sle
+        proj_mass = exp_mass
+        proj_smb = exp_smb
 
         # Historical simulations start at different years since initialization was left
         # up to the modelers
@@ -589,11 +534,11 @@ for d, data in domain.items():
         # Let's add the data to the main DataFrame
         m_time = np.hstack((hist_time, proj_time))
         m_sle = -np.hstack((hist_sle, proj_sle)) * 100
-        m_sle -= np.interp(hist_start, m_time, m_sle)
+        m_sle -= np.interp(proj_start, m_time, m_sle)
         m_mass = np.hstack((hist_mass, proj_mass))
-        m_mass -= np.interp(hist_start, m_time, m_mass)
+        m_mass -= np.interp(proj_start, m_time, m_mass)
         m_smb = np.cumsum(np.hstack((hist_smb, proj_smb)))
-        m_smb -= np.interp(hist_start, m_time, m_smb)
+        m_smb -= np.interp(proj_start, m_time, m_smb)
         m_d = m_mass - m_smb
         n = len(m_time)
         dfs.append(
@@ -677,24 +622,28 @@ for d, data in domain.items():
     model_trends = model_trends.groupby(by=["Group", "Model"]).mean(numeric_only=False).reset_index()
     model_trends["Meet_Threshold"] = np.abs(1 - model_trends["Trend (Gt/yr)"] / grace_trend) <= tolerance
     # Create unique ID column Group-Model
-    model_trends['Group-Model'] = model_trends['Group'] + '-' + model_trends['Model']
-    
+    model_trends["Group-Model"] = model_trends["Group"] + "-" + model_trends["Model"]
+
     # %% Compare historical trend with final outcome of sea level equivalent
-    final = df[df["Time"]==2100].copy()
-    final['Group-Model'] = final['Group'] + '-' + final['Model']
-    # Select those experimental results from experiments 05, 06, and 08, 
+    final = df[df["Time"] == 2100].copy()
+    final["Group-Model"] = final["Group"] + "-" + final["Model"]
+    # Select those experimental results from experiments 05, 06, and 08,
     #   which are the RCP8.5 experiments, with medium Slater ocean sensitivity
     #   and MIROC5, NorESM and HadGEM2-ES GCMs
-    final_rcp85core = final.loc[final['Exp'].isin(['exp05', 'exp06', 'exp08'])].copy()
-    final_rcp85core = final_rcp85core.groupby(['Group-Model']).mean() # Take the mean of the three models
-    final_rcp85core = final_rcp85core.merge(model_trends, on='Group-Model') # Merge the 2100 mass loss with the observed trend
 
-    fig, ax = plt.subplots()#num="SLE v Trend", clear=True)
-    final_rcp85core.plot(x="Trend (Gt/yr)",
-                         y="SLE (cm)",
-                         kind="scatter",
-                         ax=ax,
-                         )
+    final_rcp85core = final.loc[final["Exp"].isin(["exp05", "exp06", "exp08"])].copy()
+    final_rcp85core = final_rcp85core.groupby(["Group-Model"]).mean()  # Take the mean of the three models
+    final_rcp85core = final_rcp85core.merge(
+        model_trends, on="Group-Model"
+    )  # Merge the 2100 mass loss with the observed trend
+
+    fig, ax = plt.subplots()  # num="SLE v Trend", clear=True)
+    final_rcp85core.plot(
+        x="Trend (Gt/yr)",
+        y="SLE (cm)",
+        kind="scatter",
+        ax=ax,
+    )
     ax.set_xlabel(f"{hist_start}-{proj_start} Mass Loss Trend (Gt/yr)")
     ax.set_ylabel("2100 SLE Mass Loss (cm)")
     # # Label the scatter plot with the Group-Model names
@@ -707,9 +656,8 @@ for d, data in domain.items():
 
     # %% Build Final Plots
     h_df = df[(df["Time"] >= hist_start) & (df["Time"] <= proj_start)]
-    plot_historical_fluxes(f"{d}_fluxes_historical.pdf", h_df)
+    plot_historical_fluxes(f"{d}_fluxes_historical.pdf", h_df, grace)
     plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
     plot_prognostic(f"{d}_prognostic.pdf", df)
-    plot_prognostic_uaf(f"{d}_prognostic_uaf.pdf", df)
     plot_trends(f"{d}_trends.pdf", df)
     plot_prognostic_w_scaling(f"{d}_prognostic_scaled.pdf", df, model_trends, grace_trend)
