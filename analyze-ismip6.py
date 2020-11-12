@@ -13,19 +13,6 @@ import seaborn as sns
 from pathlib import Path
 import statsmodels.api as sm
 
-import torch
-import theano as tt
-
-
-class linearRegression(torch.nn.Module):
-    def __init__(self, inputSize, outputSize):
-        super(linearRegression, self).__init__()
-        self.linear = torch.nn.Linear(inputSize, outputSize)
-
-    def forward(self, x):
-        out = self.linear(x)
-        return out
-
 
 def set_size(w, h, ax=None):
     """ w, h: width, height in inches """
@@ -176,6 +163,132 @@ def plot_prognostic(out_filename, df):
         width=0.8,
         linewidth=0.75,
         fliersize=0.40,
+        ax=ax[1],
+    )
+    sns.despine(ax=ax[1], left=True, bottom=True)
+    try:
+        ax[1].get_legend().remove()
+    except:
+        pass
+    ax[0].set_ylim(xmin, xmax)
+    ax[1].set_ylim(xmin, xmax)
+    ax[0].set_xlim(proj_start, proj_end)
+    ax[1].set_xlabel(None)
+    ax[1].set_ylabel(None)
+    ax[1].axes.xaxis.set_visible(False)
+    ax[1].axes.yaxis.set_visible(False)
+    ax[0].set_xlabel("Year")
+    ax[0].set_ylabel("SLE contribution (cm)")
+    fig.savefig(out_filename, bbox_inches="tight")
+
+
+def plot_historical_as19(out_filename, df, grace, as19):
+    def plot_signal(g):
+
+        return ax.plot(g[-1]["Year"], g[-1]["Mass (Gt)"] - g[-1]["Mass (Gt)"].iloc[7], color="0.75", linewidth=0.5)
+
+    fig = plt.figure(num="historical", clear=True)
+    ax = fig.add_subplot(111)
+
+    # [plot_signal(g) for g in as19.groupby(by=["RCP", "Experiment"])]
+
+    # Plot GRACE and model results
+    ax.fill_between(
+        grace["Time"],
+        grace["Mass (Gt)"] - 2 * grace["Sigma (Gt)"],
+        grace["Mass (Gt)"] + 2 * grace["Sigma (Gt)"],
+        color="#9ecae1",
+    )
+
+    grace_line = ax.plot(
+        grace["Time"], grace["Mass (Gt)"], "-", color="#3182bd", linewidth=1, label="GRACE mass changes"  # ":",
+    )
+
+    as19_median = as19[as19["RCP"] == rcp].groupby(by="Year").quantile(0.50)
+    as19_median = as19_median - as19_median.iloc[7]
+    (l_as19_50,) = ax.plot(
+        as19_median.index, as19_median["Mass (Gt)"], linewidth=1, color="0.0", label="AS19 LES median"
+    )
+    as19_5 = as19[as19["RCP"] == rcp].groupby(by="Year").quantile(0.05)
+    as19_5 = as19_5 - as19_5.iloc[7]
+    (l_as19_5,) = ax.plot(as19_5.index, as19_5["Mass (Gt)"], linewidth=0.5, color="0.30", label="AS19 LES 5th")
+    as19_95 = as19[as19["RCP"] == rcp].groupby(by="Year").quantile(0.95)
+    as19_95 = as19_95 - as19_95.iloc[7]
+    (l_as19_95,) = ax.plot(as19_95.index, as19_95["Mass (Gt)"], linewidth=0.5, color="0.60", label="AS19 LES 95th")
+    ax.legend(handles=[grace_line[0], l_as19_50, l_as19_5, l_as19_95], loc="upper right")
+    set_size(6, 2)
+
+    ax.set_xlabel("Year")
+    ax.set_ylabel(f"Cumulative mass change\nsince {hist_start} (Gt)")
+
+    ax.set_xlim(left=2005, right=2020)
+    ax.set_ylim(-2000, 4000)
+
+    fig.savefig(out_filename, bbox_inches="tight")
+
+
+def plot_prognostic_w_as19(out_filename, df, as19):
+    """
+    Plot model projections
+    """
+
+    xmin = 0
+    xmax = 45
+    fig, ax = plt.subplots(
+        1,
+        2,
+        sharey="col",
+        figsize=[6.2, 2.0],
+        num="prognostic_all",
+        clear=True,
+        gridspec_kw=dict(width_ratios=[20, 1]),
+    )
+    fig.subplots_adjust(wspace=0.025)
+
+    def plot_signal(g):
+        # if g[-1]["Meet_Threshold"].any() == True:
+        #     signal_color = "#74c476"
+        # else:
+        #     signal_color = "0.5"
+        signal_color = "0.5"
+
+        return ax[0].plot(g[-1]["Time"], g[-1]["SLE (cm)"], color=signal_color, linewidth=0.1)
+
+    # Plot each model response by grouping
+    # [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
+
+    for rcp, rcp_col, rcp_col_shade in zip(
+        ["85", "26"],
+        [
+            "#990002",
+            "#003466",
+        ],
+        ["#F4A582", "#4393C3"],
+    ):
+        m_df = df[df["RCP"] == rcp]
+        median = m_df.groupby(by=["Time"]).quantile(0.50)
+        pctl5 = m_df.groupby(by=["Time"]).quantile(0.05)
+        pctl25 = m_df.groupby(by=["Time"]).quantile(0.25)
+        pctl75 = m_df.groupby(by=["Time"]).quantile(0.75)
+        pctl95 = m_df.groupby(by=["Time"]).quantile(0.95)
+        ax[0].plot(median.index, median["SLE (cm)"], linewidth=0.75, color=rcp_col)
+        l90 = ax[0].fill_between(pctl95.index, pctl5["SLE (cm)"], pctl95["SLE (cm)"], color=rcp_col_shade)
+        ax[0].plot(pctl5.index, pctl5["SLE (cm)"], linewidth=0.5, color=rcp_col)
+        ax[0].plot(pctl95.index, pctl95["SLE (cm)"], linewidth=0.5, color=rcp_col)
+    ## Boxplot
+    sns.boxplot(
+        data=as19[(as19["Year"] == 2100) & (as19["RCP"] != 45)],
+        x="RCP",
+        y="SLE (cm)",
+        hue="RCP",
+        palette=[
+            "#4393C3",
+            "#F4A582",
+        ],
+        whis=[5, 95],
+        fliersize=0,
+        width=1.0,
+        linewidth=0.75,
         ax=ax[1],
     )
     sns.despine(ax=ax[1], left=True, bottom=True)
@@ -489,52 +602,8 @@ for d, data in domain.items():
     grace_bias = p[0]
     grace_trend = p[1]
 
-    x_train = x.astype(np.float32).values.reshape(-1, 1)
-    y_train = y.astype(np.float32).values.reshape(-1, 1)
-    # # create dummy data for training
-    # x_values = [i for i in range(11)]
-    # x_train = np.array(x_values, dtype=np.float32)
-    # x_train = x_train.reshape(-1, 1)
-
-    # y_values = [2 * i + 1 for i in x_values]
-    # y_train = np.array(y_values, dtype=np.float32)
-    # y_train = y_train.reshape(-1, 1)
-    inputDim = 1  # takes variable 'x'
-    outputDim = 1  # takes variable 'y'
-    learningRate = 0.01
-    epochs = 100
-
-    tols = linearRegression(inputDim, outputDim)
-    criterion = torch.nn.MSELoss()
-    optimizer = torch.optim.SGD(tols.parameters(), lr=learningRate)
-    for epoch in range(epochs):
-        # Converting inputs and labels to Variable
-        if torch.cuda.is_available():
-            inputs = torch.autograd.Variable(torch.from_numpy(x_train).cuda())
-            labels = torch.autograd.Variable(torch.from_numpy(y_train).cuda())
-        else:
-            inputs = torch.autograd.Variable(torch.from_numpy(x_train))
-            labels = torch.autograd.Variable(torch.from_numpy(y_train))
-
-        # Clear gradient buffers because we don't want any gradient from previous epoch to carry forward, dont want to cummulate gradients
-        optimizer.zero_grad()
-
-        # get output from the model, given the inputs
-        outputs = tols(inputs)
-
-        # get loss for the predicted output
-        loss = criterion(outputs, labels)
-        print(loss)
-        # get gradients w.r.t to parameters
-        loss.backward()
-
-        # update parameters
-        optimizer.step()
-
-        print("epoch {}, loss {}".format(epoch, loss.item()))
-
-    # # re-standardize baseline mass change to be zero at hist_start
-    # grace["Mass (Gt)"] += grace_trend * (proj_start - hist_start)
+    as19 = pd.read_csv("as19//aschwanden_et_al_2019_les.gz")
+    as19["SLE (cm)"] = -as19["Mass (Gt)"] / 362.5 / 10
 
     # Now read model output from each of the ISMIP6 files. The information we
     # need is in the file names, not the metadate so this is no fun.
@@ -559,6 +628,10 @@ for d, data in domain.items():
             g1, g2, model, exp = f
             group = f"{g1}_{g2}"
 
+        if exp in ["exp07"]:
+            rcp = 26
+        else:
+            rcp = 85
         # Find the coressponding CTRL Historical simulations
         ctrl_file = [m for m in ctrl_files if (f"{group}_{model}" in m.name)][0]
         hist_file = [m for m in hist_files if (f"{group}_{model}" in m.name)][0]
@@ -610,9 +683,10 @@ for d, data in domain.items():
                         np.repeat(group, n).reshape(-1, 1),
                         np.repeat(model, n).reshape(-1, 1),
                         np.repeat(exp, n).reshape(-1, 1),
+                        np.repeat(rcp, n).reshape(-1, 1),
                     ]
                 ),
-                columns=["Time", "SLE (cm)", "Mass (Gt)", "SMB (Gt)", "D (Gt)", "Group", "Model", "Exp"],
+                columns=["Time", "SLE (cm)", "Mass (Gt)", "SMB (Gt)", "D (Gt)", "Group", "Model", "Exp", "RCP"],
             )
         )
         # End of working with each model run individually (the path for-loop)
@@ -628,6 +702,7 @@ for d, data in domain.items():
             "D (Gt)": float,
             "Model": str,
             "Exp": str,
+            "RCP": str,
         }
     )
 
@@ -638,6 +713,7 @@ for d, data in domain.items():
     models = []
     exps = []
     trends = []
+    sigmas = []
     # meet_thresh = []
     for g in df.groupby(by=["Group", "Model", "Exp"]):
         m_df = g[-1][(g[-1]["Time"] >= hist_start) & (g[-1]["Time"] <= proj_start)]
@@ -649,10 +725,12 @@ for d, data in domain.items():
         p = ols.params
         model_bias = p[0]
         model_trend = p[1]
+        model_trend_sigma = ols.bse[-1]
         groups.append(g[0][0])
         models.append(g[0][1])
         exps.append(g[0][2])
         trends.append(model_trend)
+        sigmas.append(model_trend_sigma)
         # meet_thresh.append(np.abs(1 - model_trend / grace_trend) <= tolerance)
         if np.abs(1 - model_trend / grace_trend) <= tolerance:
             pass_dfs.append(g[-1])
@@ -666,6 +744,17 @@ for d, data in domain.items():
         pass_df = pd.concat(pass_dfs)
         pass_df["Meet_Threshold"] = True
     df = pd.concat([fail_df, pass_df])
+    df = df.astype(
+        {
+            "Time": float,
+            "SLE (cm)": float,
+            "Mass (Gt)": float,
+            "SMB (Gt)": float,
+            "D (Gt)": float,
+            "Model": str,
+            "Exp": str,
+        }
+    ).reset_index(drop=True)
     model_trends = pd.DataFrame(
         data=np.hstack(
             [
@@ -673,12 +762,15 @@ for d, data in domain.items():
                 np.array(models).reshape(-1, 1),
                 np.array(exps).reshape(-1, 1),
                 np.array(trends).reshape(-1, 1),
+                np.array(sigmas).reshape(-1, 1),
                 # np.array(meet_thresh).reshape(-1, 1),
             ]
         ),
-        columns=["Group", "Model", "Exp", "Trend (Gt/yr)"],  # "Meet_Threshold"],
+        columns=["Group", "Model", "Exp", "Trend (Gt/yr)", "Sigma (Gt/yr)"],  # "Meet_Threshold"],
     )
-    model_trends = model_trends.astype({"Group": str, "Model": str, "Exp": str, "Trend (Gt/yr)": float})
+    model_trends = model_trends.astype(
+        {"Group": str, "Model": str, "Exp": str, "Trend (Gt/yr)": float, "Sigma (Gt/yr)": float}
+    )
     model_trends = model_trends.groupby(by=["Group", "Model"]).mean(numeric_only=False).reset_index()
     model_trends["Meet_Threshold"] = np.abs(1 - model_trends["Trend (Gt/yr)"] / grace_trend) <= tolerance
     # Create unique ID column Group-Model
@@ -697,15 +789,15 @@ for d, data in domain.items():
         model_trends, on="Group-Model"
     )  # Merge the 2100 mass loss with the observed trend
 
-    fig, ax = plt.subplots()  # num="SLE v Trend", clear=True)
-    final_rcp85core.plot(
-        x="Trend (Gt/yr)",
-        y="SLE (cm)",
-        kind="scatter",
-        ax=ax,
-    )
-    ax.set_xlabel(f"{hist_start}-{proj_start} Mass Loss Trend (Gt/yr)")
-    ax.set_ylabel("2100 SLE Mass Loss (cm)")
+    # fig, ax = plt.subplots()  # num="SLE v Trend", clear=True)
+    # final_rcp85core.plot(
+    #     x="Trend (Gt/yr)",
+    #     y="SLE (cm)",
+    #     kind="scatter",
+    #     ax=ax,
+    # )
+    # ax.set_xlabel(f"{hist_start}-{proj_start} Mass Loss Trend (Gt/yr)")
+    # ax.set_ylabel("2100 SLE Mass Loss (cm)")
     # # Label the scatter plot with the Group-Model names
     # for i in range(len(final_rcp85core)):
     #     ax.text(final_rcp85core['Trend (Gt/yr)'].values[i],
@@ -715,9 +807,11 @@ for d, data in domain.items():
     # ax.grid('on')
 
     # %% Build Final Plots
-    h_df = df[(df["Time"] >= hist_start) & (df["Time"] <= proj_start)]
-    plot_historical_fluxes(f"{d}_fluxes_historical.pdf", h_df, grace)
-    plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
-    plot_prognostic(f"{d}_prognostic.pdf", df)
-    plot_trends(f"{d}_trends.pdf", df)
-    plot_prognostic_w_scaling(f"{d}_prognostic_scaled.pdf", df, model_trends, grace_trend)
+    # h_df = df[(df["Time"] >= hist_start) & (df["Time"] <= proj_start)]
+    # plot_historical_fluxes(f"{d}_fluxes_historical.pdf", h_df, grace)
+    # plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
+    # plot_prognostic(f"{d}_prognostic.pdf", df)
+    # plot_trends(f"{d}_trends.pdf", df)
+    # plot_prognostic_w_scaling(f"{d}_prognostic_scaled.pdf", df, model_trends, grace_trend)
+    plot_prognostic_w_as19(f"{d}_prognostic_w_as19.pdf", df, as19)
+    plot_historical_as19(f"{d}_historical_as19.pdf", df, grace, as19)
