@@ -636,6 +636,17 @@ for d, data in domain.items():
         hist_mass = (nc_hist.variables["limgr"][:-1] - nc_hist.variables["limgr"][-1]) / 1e12
         hist_smb = nc_hist.variables["smb"][:-1] / 1e12 * secpera
 
+        # Per email with Heiko on Nov. 13, 2020, stick with just the exp projections alone, without adding back the ctrl projections
+        '''
+        from Heiko:
+        "The solution that we chose for ISMIP6 is therefore to remove the ctrl_proj from the projections
+        and communicate the numbers as such, i.e. SL contribution for additional forcing after 2014. 
+        In our (strong) opinion, the results should never be communicated uncorrected."
+        
+        Also, point of reference from Goelzer et al., 2020, the ctrl simulations represent mass change
+        with the SMB fixed to 1960-1989 levels (no anomaly in SMB) and no change in ice sheet mask.
+        So ctrl after the historical spinup represents an abrupt return to an earlier SMB forcing in 2015.
+        '''
         # proj_sle = exp_sle + ctrl_sle
         # proj_mass = exp_mass + ctrl_mass
         # proj_smb = exp_smb + ctrl_smb
