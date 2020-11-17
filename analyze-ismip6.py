@@ -13,6 +13,10 @@ import seaborn as sns
 from pathlib import Path
 import statsmodels.api as sm
 
+import matplotlib as mpl
+import matplotlib.cm as cmx
+import matplotlib.colors as colors
+
 
 def set_size(w, h, ax=None):
     """ w, h: width, height in inches """
@@ -428,37 +432,24 @@ def plot_historical(out_filename, df, grace, model_trends):
     the GRACE signal and trend.
     """
 
-    fig = plt.figure(num="historical", clear=True)
-    ax = fig.add_subplot(111)
-
     def plot_signal(g):
-        # plt.pause(0.1)
-        # ax.set_title(str(g[0]))
-        # input(str(g[0]) + "  press")
         m_df = g[-1]
         x = m_df["Time"]
         y = m_df["Mass (Gt)"]
-        if m_df["Meet_Threshold"].values[0]:
-            signal_color = "#74c476"
-        else:
-            signal_color = "0.75"
+        signal_color = "0.5"
 
-        return ax.plot(x, y, color=signal_color, linewidth=0.5)
+        return ax.plot(x, y, color=signal_color, linewidth=0.25)
 
-    def plot_trend(model_trend):
-        if np.abs(1 - model_trend / grace_trend) < tolerance:
-            trend_color = "#238b45"
-        else:
-            trend_color = "0.5"
+    xmin = 2000
+    xmax = 2030
+    ymin = -3000
+    ymax = 5000
 
-        return ax.plot(
-            [hist_start, proj_start],
-            # [model_trend * (hist_start - proj_start), 0],
-            [0, -model_trend * (hist_start - proj_start)],  # zero at hist_start
-            color=trend_color,
-            linewidth=0.75,
-        )
-
+    fig = plt.figure(num="historical", clear=True)
+    ax = fig.add_subplot(111)
+    # ax.fill_between([xmin, proj_start], [ymin, ymin], [ymax, ymax], color="0.95")
+    # ax.fill_between([proj_start, xmax], [ymin, ymin], [ymax, ymax], color="0.85")
+    ax.axvline(proj_start, color="k", linestyle="dotted", linewidth=0.5)
     # Plot GRACE and model results
     ax.fill_between(
         grace["Time"],
@@ -468,30 +459,25 @@ def plot_historical(out_filename, df, grace, model_trends):
     )
 
     [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
-    # [plot_trend(row[-1]["Trend (Gt/yr)"]) for row in model_trends.iterrows()]
 
     grace_line = ax.plot(
-        grace["Time"], grace["Mass (Gt)"], "-", color="#3182bd", linewidth=1, label="GRACE mass changes"  # ":",
+        grace["Time"], grace["Mass (Gt)"], "-", color="#3182bd", linewidth=1, label="GRACE mass changes"
     )
+    model_line = mlines.Line2D([], [], color="0.5", linewidth=0.5, label="ISMIP6 realizations")
 
-    # (l_g,) = ax.plot(  # GRACE trend
-    #     [hist_start, proj_start],
-    #     # [grace_bias + grace_trend * hist_start, 0],
-    #     [0, grace_bias + grace_trend * proj_start],  # zero at hist_start
-    #     color="#2171b5",
-    #     linewidth=1.0,
-    # )
+    ax.text(2014, 4000, "Historical Period", ha="right")
+    ax.text(2016, 4000, "Projection Period", ha="left")
+    legend = ax.legend(handles=[grace_line[0], model_line], loc="lower left")
+    legend.get_frame().set_linewidth(0.0)
+    legend.get_frame().set_alpha(0.0)
 
-    good_models = mlines.Line2D([], [], color="#74c476", linewidth=0.5, label="Model trends within 25% of GRACE")
-    all_models = mlines.Line2D([], [], color="0.75", linewidth=0.5, label="Other model trends")
-    plt.legend(handles=[grace_line[0], good_models, all_models], loc="upper right")
     set_size(6, 2)
 
     ax.set_xlabel("Year")
-    ax.set_ylabel(f"Cumulative mass change\nsince {hist_start} (Gt)")
+    ax.set_ylabel(f"Cumulative mass change\nsince {proj_start} (Gt)")
 
-    ax.set_xlim(left=2000, right=2030)
-    ax.set_ylim(-3000, 5000)
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
 
     fig.savefig(out_filename, bbox_inches="tight")
 
@@ -809,9 +795,9 @@ for d, data in domain.items():
     # %% Build Final Plots
     # h_df = df[(df["Time"] >= hist_start) & (df["Time"] <= proj_start)]
     # plot_historical_fluxes(f"{d}_fluxes_historical.pdf", h_df, grace)
-    # plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
+    plot_historical(f"{d}_historical.pdf", df, grace, model_trends)
     # plot_prognostic(f"{d}_prognostic.pdf", df)
     # plot_trends(f"{d}_trends.pdf", df)
     # plot_prognostic_w_scaling(f"{d}_prognostic_scaled.pdf", df, model_trends, grace_trend)
-    plot_prognostic_w_as19(f"{d}_prognostic_w_as19.pdf", df, as19)
-    plot_historical_as19(f"{d}_historical_as19.pdf", df, grace, as19)
+    # plot_prognostic_w_as19(f"{d}_prognostic_w_as19.pdf", df, as19)
+    # plot_historical_as19(f"{d}_historical_as19.pdf", df, grace, as19)
