@@ -17,6 +17,9 @@ import matplotlib as mpl
 import matplotlib.cm as cmx
 import matplotlib.colors as colors
 
+from datetime import datetime
+import time
+
 
 def set_size(w, h, ax=None):
     """ w, h: width, height in inches """
@@ -32,9 +35,25 @@ def set_size(w, h, ax=None):
     ax.figure.set_size_inches(figw, figh)
 
 
-def plot_historical_fluxes(out_filename, df, mou19):
+def toYearFraction(date):
+    def sinceEpoch(date):  # returns seconds since epoch
+        return time.mktime(date.timetuple())
+
+    s = sinceEpoch
+
+    year = date.year
+    startOfThisYear = datetime(year=year, month=1, day=1)
+    startOfNextYear = datetime(year=year + 1, month=1, day=1)
+
+    yearElapsed = s(date) - s(startOfThisYear)
+    yearDuration = s(startOfNextYear) - s(startOfThisYear)
+    fraction = yearElapsed / yearDuration
+
+    return date.year + fraction
+
+
+def plot_historical_partitioning_cumulative(out_filename, df, mou19):
     def plot_smb(g):
-        signal_color = "0.5"
         return ax.plot(
             g[-1]["Year"],
             g[-1]["SMB (Gt)"],
@@ -44,7 +63,6 @@ def plot_historical_fluxes(out_filename, df, mou19):
         )
 
     def plot_d(g):
-        signal_color = "0.5"
         return ax.plot(
             g[-1]["Year"],
             g[-1]["D (Gt)"],
@@ -92,8 +110,8 @@ def plot_historical_fluxes(out_filename, df, mou19):
 
     ax.axvline(proj_start, color="k", linestyle="dashed", linewidth=grace_signal_lw)
     ax.axhline(0, color="k", linestyle="dotted", linewidth=grace_signal_lw)
-    ax.text(2014.5, 2000, "Historical Period", ha="right")
-    ax.text(2015.5, 2000, "Projection Period", ha="left")
+    ax.text(2014.75, -7000, "Historical Period", ha="right")
+    ax.text(2015.25, -7000, "Projection Period", ha="left")
 
     l_smb = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="solid", label="SMB")
     l_d = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="dotted", label="D")
@@ -118,12 +136,114 @@ def plot_historical_fluxes(out_filename, df, mou19):
     ax.set_xlabel("Year")
     ax.set_ylabel(f"Cumulative flux\since{proj_start} (Gt)")
 
-    ax.set_xlim(2000, 2020)
+    ax.set_xlim(2000, 2025)
     ymin = -7500
     ymax = 7500
     ax.set_ylim(ymin, ymax)
 
-    set_size(6, 2)
+    set_size(4.7, 2)
+    fig.savefig(out_filename, bbox_inches="tight")
+
+
+def plot_historical_partitioning(out_filename, df, mou19, man):
+    def plot_smb(g):
+        return ax.plot(
+            g[-1]["Year"],
+            g[-1]["SMB (Gt/yr)"],
+            color=simulated_signal_color,
+            linewidth=simulated_signal_lw,
+            linestyle="solid",
+        )
+
+    def plot_d(g):
+        return ax.plot(
+            g[-1]["Year"],
+            g[-1]["D (Gt/yr)"],
+            color=simulated_signal_color,
+            linewidth=simulated_signal_lw,
+            linestyle="dotted",
+        )
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    [plot_smb(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
+    [plot_d(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
+
+    ax.fill_between(
+        mou19["Year"],
+        0.95 * mou19["SMB (Gt/yr)"],
+        1.05 * mou19["SMB (Gt/yr)"],
+        color=mouginot_sigma_color,
+        linewidth=mouginot_signal_lw,
+        linestyle="solid",
+    )
+    ax.fill_between(
+        mou19["Year"],
+        0.96 * mou19["D (Gt/yr)"],
+        1.04 * mou19["D (Gt/yr)"],
+        color=mouginot_sigma_color,
+        linewidth=mouginot_signal_lw,
+        linestyle="dotted",
+    )
+
+    ax.plot(
+        mou19["Year"],
+        mou19["SMB (Gt/yr)"],
+        color=mouginot_signal_color,
+        linewidth=mouginot_signal_lw,
+        linestyle="solid",
+    )
+    ax.plot(
+        mou19["Year"],
+        mou19["D (Gt/yr)"],
+        color=mouginot_signal_color,
+        linewidth=mouginot_signal_lw,
+        linestyle="dotted",
+    )
+
+    ax.plot(
+        man["Year"],
+        -man["Discharge [Gt yr-1]"],
+        color="#005a32",
+        linewidth=mouginot_signal_lw,
+        linestyle="dotted",
+    )
+
+    ax.axvline(proj_start, color="k", linestyle="dashed", linewidth=grace_signal_lw)
+    ax.axhline(0, color="k", linestyle="dotted", linewidth=grace_signal_lw)
+
+    l_smb = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="solid", label="SMB")
+    l_d = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="dotted", label="D")
+    l_mou19 = mlines.Line2D(
+        [], [], color=mouginot_signal_color, linewidth=0.5, linestyle="solid", label="Observed (Mouginot et al, 2019)"
+    )
+    l_man = mlines.Line2D(
+        [], [], color="#005a32", linewidth=0.5, linestyle="solid", label="Observed (Mankoff et al, 2020)"
+    )
+    l_simulated = mlines.Line2D(
+        [], [], color=simulated_signal_color, linewidth=0.5, linestyle="solid", label="Simulated"
+    )
+    legend_1 = ax.legend(handles=[l_smb, l_d], loc="upper left")
+    legend_1.get_frame().set_linewidth(0.0)
+    legend_1.get_frame().set_alpha(0.0)
+
+    legend_2 = ax.legend(handles=[l_mou19, l_man, l_simulated], loc="upper right")
+    legend_2.get_frame().set_linewidth(0.0)
+    legend_2.get_frame().set_alpha(0.0)
+
+    # Pylab automacially removes first legend when legend is called a second time.
+    # Add legend 1 back
+    ax.add_artist(legend_1)
+
+    ax.set_xlabel("Year")
+    ax.set_ylabel(f"Flux (Gt/ur)")
+
+    ax.set_xlim(2000, 2014)
+    ymin = -750
+    ymax = 750
+    ax.set_ylim(ymin, ymax)
+
+    set_size(3.2, 2)
     fig.savefig(out_filename, bbox_inches="tight")
 
 
@@ -162,37 +282,6 @@ def plot_prognostic(out_filename, df):
     # Plot each model response by grouping
     [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
 
-    ## Historgram plots
-    # sns.histplot(
-    #     f_df,
-    #     y="SLE (cm)",
-    #     bins=np.linspace(-2, 20, 23),
-    #     kde=True,
-    #     fill=False,
-    #     color="0.5",
-    #     ax=ax[1],
-    # )
-    # sns.histplot(
-    #     p_df,
-    #     y="SLE (cm)",
-    #     bins=np.linspace(-2, 20, 23),
-    #     kde=True,
-    #     fill=False,
-    #     color="#238b45",
-    #     ax=ax[1],
-    # )
-    # sns.kdeplot(
-    #     data=df[df["Year"] == 2100],
-    #     y="SLE (cm)",
-    #     hue="Meet_Threshold",
-    #     palette=["0.5", "#238b45"],
-    #     common_norm=False,
-    #     clip=[xmin, xmax],
-    #     linewidth=0.75,
-    #     legend=False,
-    #     ax=ax[1],
-    # )
-
     ## Boxplot
     sns.boxplot(
         data=df[df["Year"] == 2100],
@@ -219,244 +308,6 @@ def plot_prognostic(out_filename, df):
     ax[1].axes.yaxis.set_visible(False)
     ax[0].set_xlabel("Year")
     ax[0].set_ylabel("SLE contribution (cm)")
-    fig.savefig(out_filename, bbox_inches="tight")
-
-
-def plot_historical_as19(out_filename, df, grace, as19):
-    def plot_signal(g):
-
-        return ax.plot(g[-1]["Year"], g[-1]["Mass (Gt)"] - g[-1]["Mass (Gt)"].iloc[7], color="0.75", linewidth=0.5)
-
-    fig = plt.figure(num="historical", clear=True)
-    ax = fig.add_subplot(111)
-
-    # Plot GRACE
-    ax.fill_between(
-        grace["Year"],
-        grace["Mass (Gt)"] - 2 * grace["Sigma (Gt)"],
-        grace["Mass (Gt)"] + 2 * grace["Sigma (Gt)"],
-        color=grace_sigma_color,
-    )
-
-    grace_line = ax.plot(
-        grace["Year"], grace["Mass (Gt)"], "-", color="#3182bd", linewidth=1, label="GRACE mass changes"  # ":",
-    )
-
-    as19_median = as19[as19["RCP"] == rcp].groupby(by="Year").quantile(0.50)
-    as19_median = as19_median - as19_median.iloc[7]
-    (l_as19_50,) = ax.plot(
-        as19_median.index, as19_median["Mass (Gt)"], linewidth=1, color="0.0", label="AS19 LES median"
-    )
-    as19_5 = as19[as19["RCP"] == rcp].groupby(by="Year").quantile(0.05)
-    as19_5 = as19_5 - as19_5.iloc[7]
-    (l_as19_5,) = ax.plot(as19_5.index, as19_5["Mass (Gt)"], linewidth=0.5, color="0.30", label="AS19 LES 5th")
-    as19_95 = as19[as19["RCP"] == rcp].groupby(by="Year").quantile(0.95)
-    as19_95 = as19_95 - as19_95.iloc[7]
-    (l_as19_95,) = ax.plot(as19_95.index, as19_95["Mass (Gt)"], linewidth=0.5, color="0.60", label="AS19 LES 95th")
-    ax.legend(handles=[grace_line[0], l_as19_50, l_as19_5, l_as19_95], loc="upper right")
-    set_size(6, 2)
-
-    ax.set_xlabel("Year")
-    ax.set_ylabel(f"Cumulative mass change\nsince {hist_start} (Gt)")
-
-    ax.set_xlim(left=2005, right=2020)
-    ax.set_ylim(-2000, 4000)
-
-    fig.savefig(out_filename, bbox_inches="tight")
-
-
-def plot_prognostic_w_as19(out_filename, df, as19):
-    """
-    Plot model projections
-    """
-
-    xmin = 0
-    xmax = 45
-    fig, ax = plt.subplots(
-        1,
-        2,
-        sharey="col",
-        figsize=[6.2, 2.0],
-        num="prognostic_all",
-        clear=True,
-        gridspec_kw=dict(width_ratios=[20, 1]),
-    )
-    fig.subplots_adjust(wspace=0.025)
-
-    def plot_signal(g):
-        # if g[-1]["Meet_Threshold"].any() == True:
-        #     signal_color = "#74c476"
-        # else:
-        #     signal_color = "0.5"
-        signal_color = "0.5"
-
-        return ax[0].plot(g[-1]["Year"], g[-1]["SLE (cm)"], color=signal_color, linewidth=0.1)
-
-    # Plot each model response by grouping
-    # [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
-
-    for rcp, rcp_col, rcp_col_shade in zip(
-        ["85", "26"],
-        [
-            "#990002",
-            "#003466",
-        ],
-        ["#F4A582", "#4393C3"],
-    ):
-        m_df = df[df["RCP"] == rcp]
-        median = m_df.groupby(by=["Year"]).quantile(0.50)
-        pctl5 = m_df.groupby(by=["Year"]).quantile(0.05)
-        pctl25 = m_df.groupby(by=["Year"]).quantile(0.25)
-        pctl75 = m_df.groupby(by=["Year"]).quantile(0.75)
-        pctl95 = m_df.groupby(by=["Year"]).quantile(0.95)
-        ax[0].plot(median.index, median["SLE (cm)"], linewidth=0.75, color=rcp_col)
-        l90 = ax[0].fill_between(pctl95.index, pctl5["SLE (cm)"], pctl95["SLE (cm)"], color=rcp_col_shade)
-        ax[0].plot(pctl5.index, pctl5["SLE (cm)"], linewidth=0.5, color=rcp_col)
-        ax[0].plot(pctl95.index, pctl95["SLE (cm)"], linewidth=0.5, color=rcp_col)
-    ## Boxplot
-    sns.boxplot(
-        data=as19[(as19["Year"] == 2100) & (as19["RCP"] != 45)],
-        x="RCP",
-        y="SLE (cm)",
-        hue="RCP",
-        palette=[
-            "#4393C3",
-            "#F4A582",
-        ],
-        whis=[5, 95],
-        fliersize=0,
-        width=1.0,
-        linewidth=0.75,
-        ax=ax[1],
-    )
-    sns.despine(ax=ax[1], left=True, bottom=True)
-    try:
-        ax[1].get_legend().remove()
-    except:
-        pass
-    ax[0].set_ylim(xmin, xmax)
-    ax[1].set_ylim(xmin, xmax)
-    ax[0].set_xlim(proj_start, proj_end)
-    ax[1].set_xlabel(None)
-    ax[1].set_ylabel(None)
-    ax[1].axes.xaxis.set_visible(False)
-    ax[1].axes.yaxis.set_visible(False)
-    ax[0].set_xlabel("Year")
-    ax[0].set_ylabel("SLE contribution (cm)")
-    fig.savefig(out_filename, bbox_inches="tight")
-
-
-def plot_prognostic_w_scaling(out_filename, df, model_trends, grace_trend):
-    """
-    Plot model projections with corrections
-    """
-
-    model_trends["trend_scalar"] = grace_trend / model_trends["Trend (Gt/yr)"]
-    super_df = pd.merge(df, model_trends)
-    super_df["scaled_SLE"] = super_df["SLE (cm)"] * super_df["trend_scalar"]
-
-    # min/max for binning and setting the axis bounds
-    ymin = -10  # np.floor(df[df["Year"] == 2100]["SLE (cm)"].min())
-    ymax = 40  # np.ceil(df[df["Year"] == 2100]["SLE (cm)"].max())
-
-    # Dataframe with Year 2100 only for histogram
-    p_df = df[(df["Year"] == 2100) & (df["Meet_Threshold"] == True)]
-    f_df = df[(df["Year"] == 2100) & (df["Meet_Threshold"] == False)]
-    bp_super_df = super_df[(super_df["Year"] == 2100)]
-
-    fig, ax = plt.subplots(
-        2,
-        2,
-        sharey="col",
-        figsize=[9.4, 5.5],
-        num="prognostic_all_scaled",
-        clear=True,
-        gridspec_kw=dict(width_ratios=[20, 1]),
-    )
-    fig.subplots_adjust(wspace=0.025)
-
-    def plot_signal(g):
-        if g[-1]["Meet_Threshold"].any() == True:
-            signal_color = "#74c476"
-        else:
-            signal_color = "0.5"
-        # ax[1,0].set_xlim(2007, 2020)
-        # ax[1,0].set_ylim(-2, 2)
-        # plt.pause(0.1)
-        return ax[0, 0].plot(g[-1]["Year"], g[-1]["SLE (cm)"], color=signal_color, linewidth=0.5)
-
-    def plot_signal_scaled(g):
-        if g[-1]["Meet_Threshold"].any() == True:
-            signal_color = "#74c476"
-        else:
-            signal_color = "0.5"
-        # ax[1,0].set_xlim(2007, 2020)
-        # ax[1,0].set_ylim(-2, 2)
-        # plt.pause(0.1)
-
-        # print('good')
-        # if g[-1]["Year"].any() == 1995.0:
-        #     return
-
-        return ax[1, 0].plot(g[-1]["Year"], g[-1]["scaled_SLE"], color=signal_color, linewidth=0.5)
-
-    # Plot each model response by grouping
-    [plot_signal_scaled(g) for g in super_df.groupby(by=["Group", "Model", "Exp"])]
-    [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
-
-    ## Boxplot
-    sns.boxplot(
-        data=super_df[super_df["Year"] == 2100],
-        x="Meet_Threshold",
-        y="scaled_SLE",
-        hue="Meet_Threshold",
-        palette=["0.5", "#238b45"],
-        width=0.8,
-        linewidth=0.75,
-        fliersize=0.40,
-        ax=ax[1, 1],
-    )
-    sns.despine(ax=ax[1, 1], left=True, bottom=True)
-    try:
-        ax[1, 1].get_legend().remove()
-    except:
-        pass
-
-    ## Boxplot
-    sns.boxplot(
-        data=df[df["Year"] == 2100],
-        x="Meet_Threshold",
-        y="SLE (cm)",
-        hue="Meet_Threshold",
-        palette=["0.5", "#238b45"],
-        width=0.8,
-        linewidth=0.75,
-        fliersize=0.40,
-        ax=ax[0, 1],
-    )
-    sns.despine(ax=ax[0, 1], left=True, bottom=True)
-    try:
-        ax[0, 1].get_legend().remove()
-    except:
-        pass
-
-    ax[0, 0].text(2012, 30, "Goelzer et al., 2020, ISMIP6 projections", fontsize=12)
-    ax[1, 0].text(2012, 30, "Projections linearly scaled to match 2007-2015 GRACE observations", fontsize=12)
-
-    [ax.tick_params("x", top=True) for ax in ax[:, 0]]
-    [ax.tick_params("y", right=True) for ax in ax[:, 0]]
-    [ax.set_ylim(ymin, ymax) for ax in ax[:, 0]]
-    [ax.set_ylim(ymin, ymax) for ax in ax[:, 1]]
-    # [ax.set_xlim(hist_start, proj_end) for ax in ax[:,0]]
-    [ax.set_xlim(hist_start, 2100) for ax in ax[:, 0]]
-    [ax.set_xlabel(None) for ax in ax[:, 1]]
-    [ax.set_ylabel(None) for ax in ax[:, 1]]
-    ax[0, 0].set_xticklabels("")
-    [ax.axes.xaxis.set_visible(False) for ax in ax[:, 1]]
-    [ax.axes.yaxis.set_visible(False) for ax in ax[:, 1]]
-    ax[1, 0].set_xlabel("Year")
-    [ax.set_ylabel("SLE contribution (cm)") for ax in ax[:, 0]]
-
     fig.savefig(out_filename, bbox_inches="tight")
 
 
@@ -473,7 +324,7 @@ def plot_historical(out_filename, df, grace, mou19, model_trends):
         return ax.plot(x, y, color=simulated_signal_color, linewidth=simulated_signal_lw)
 
     xmin = 2000
-    xmax = 2020
+    xmax = 2025
     ymin = -3000
     ymax = 5000
 
@@ -514,8 +365,8 @@ def plot_historical(out_filename, df, grace, mou19, model_trends):
 
     ax.axvline(proj_start, color="k", linestyle="dashed", linewidth=grace_signal_lw)
     ax.axhline(0, color="k", linestyle="dotted", linewidth=grace_signal_lw)
-    ax.text(2014.5, 4000, "Historical Period", ha="right")
-    ax.text(2015.5, 4000, "Projection Period", ha="left")
+    ax.text(2014.75, 4000, "Historical Period", ha="right")
+    ax.text(2015.25, 4000, "Projection Period", ha="left")
 
     model_line = mlines.Line2D([], [], color=simulated_signal_color, linewidth=simulated_signal_lw, label="Simulated")
 
@@ -532,7 +383,7 @@ def plot_historical(out_filename, df, grace, mou19, model_trends):
     ax_sle.set_ylabel(f"Contribution to SLE\nsince {proj_start} (cm)")
     ax_sle.set_ylim(-ymin * gt2cmSLE, -ymax * gt2cmSLE)
 
-    set_size(6, 2)
+    set_size(5, 2)
 
     fig.savefig(out_filename, bbox_inches="tight")
 
@@ -543,12 +394,11 @@ def plot_trends(out_filename, df):
     """
 
     fig, ax = plt.subplots(num="trend_plot", clear=True)
-    # sns.kdeplot(data=model_trends['Trend (Gt/yr)'])
     sns.histplot(
         data=model_trends,
         x="Trend (Gt/yr)",
-        hue="Meet_Threshold",
-        palette=["0.5", "#238b45"],
+        palette=[simulated_signal_color],
+        color=simulated_signal_color,
         bins=np.arange(-350, 300, 50),
         ax=ax,
         label="Model trend",
@@ -556,37 +406,60 @@ def plot_trends(out_filename, df):
     sns.rugplot(
         data=model_trends,
         x="Trend (Gt/yr)",
-        hue="Meet_Threshold",
-        palette=["0.5", "#238b45"],
+        palette=[simulated_signal_color],
         ax=ax,
         legend=False,
     )
-    # sns.rugplot(data=[grace_trend], ax=ax)
     ax.set_xlabel(f"{hist_start}-{proj_start} Mass Loss Trend (Gt/yr)")
-    # fig.legend(bbox_to_anchor=(0.65, .77, .01, .01), loc='lower left')
 
-    ax.set_xlim(-400, 300)
+    ax.set_xlim(-400, 200)
+    ymin = 0
+    ymax = 6.8
     ax.set_ylim(0, 6.8)
 
     # Plot dashed line for GRACE
-    ax.fill_between
-    ax.plot([grace_trend, grace_trend], [0, 6.8], "--", color="#3182bd", linewidth=3)
-    ax.text(-330, 2.8, "Grace GRACE trend", rotation=90, fontsize=12)
+    ax.fill_between(
+        [grace_trend - grace_trend_stderr, grace_trend + grace_trend_stderr],
+        [ymin, ymin],
+        [ymax, ymax],
+        color=grace_sigma_color,
+    )
+    ax.axvline(grace_trend, linestyle="solid", color=grace_signal_color, linewidth=1)
+    ax.axvline(grace_trend - grace_trend_stderr, linestyle="dotted", color=grace_signal_color, linewidth=1)
+    ax.axvline(grace_trend + grace_trend_stderr, linestyle="dotted", color=grace_signal_color, linewidth=1)
+    ax.axvline(grace_trend, linestyle="solid", color=grace_signal_color, linewidth=1)
+    ax.text(-340, 2.2, "Observed (GRACE)", rotation=90, fontsize=12)
 
-    # # Plot arrow for GRACE
-    # ax.annotate('GRACE trend',
-    #         xy=(grace_trend, 0.5), xycoords='data',
-    #         xytext=(grace_trend, 4.7), textcoords='data',
-    #         arrowprops=dict(arrowstyle='fancy', facecolor='C1', edgecolor='none',
-    #                         mutation_scale=25),
-    #         bbox=dict(fc='1', edgecolor='none'),
-    #         horizontalalignment='center', verticalalignment='top', fontsize=12
-    #         )
-
+    set_size(3.2, 2.4)
     fig.savefig(out_filename, bbox_inches="tight")
 
 
 #%% End of plotting function definitions, start of analysis
+
+fontsize = 8
+lw = 0.65
+aspect_ratio = 0.35
+markersize = 2
+
+params = {
+    "axes.linewidth": 0.25,
+    "lines.linewidth": lw,
+    "axes.labelsize": fontsize,
+    "font.size": fontsize,
+    "xtick.direction": "in",
+    "xtick.labelsize": fontsize,
+    "xtick.major.size": 2.5,
+    "xtick.major.width": 0.25,
+    "ytick.direction": "in",
+    "ytick.labelsize": fontsize,
+    "ytick.major.size": 2.5,
+    "ytick.major.width": 0.25,
+    "legend.fontsize": fontsize,
+    "lines.markersize": markersize,
+    "font.size": fontsize,
+}
+
+plt.rcParams.update(params)
 
 
 secpera = 3.15569259747e7
@@ -647,16 +520,14 @@ for d, data in domain.items():
     grace_time = (grace["Year"] >= hist_start) & (grace["Year"] <= proj_start)
     grace_hist_df = grace[grace_time]
     x = grace_hist_df["Year"]
-    y = grace_hist_df["Mass (Gt)"][(grace["Year"] >= hist_start) & (grace["Year"] <= proj_start)]
-    s = grace_hist_df["Sigma (Gt)"][(grace["Year"] >= hist_start) & (grace["Year"] <= proj_start)]
+    y = grace_hist_df["Mass (Gt)"]
+    s = grace_hist_df["Sigma (Gt)"]
     X = sm.add_constant(x)
     ols = sm.OLS(y, X).fit()
     p = ols.params
     grace_bias = p[0]
     grace_trend = p[1]
-
-    as19 = pd.read_csv("as19//aschwanden_et_al_2019_les.gz")
-    as19["SLE (cm)"] = -as19["Mass (Gt)"] / 362.5 / 10
+    grace_trend_stderr = ols.bse[1]
 
     mou19_df = pd.read_excel("pnas.1904242116.sd02.xlsx", sheet_name="(2) MB_GIS", header=8, usecols="B,AR:BJ")
     mou19_d = mou19_df.iloc[7]
@@ -669,14 +540,18 @@ for d, data in domain.items():
                 mou19_mass.values[1::].reshape(-1, 1),
                 np.cumsum(mou19_smb.values[1::]).reshape(-1, 1),
                 -np.cumsum(mou19_d.values[1::]).reshape(-1, 1),
+                mou19_smb.values[1::].reshape(-1, 1),
+                -mou19_d.values[1::].reshape(-1, 1),
             ]
         ),
-        columns=["Year", "Mass (Gt)", "SMB (Gt)", "D (Gt)"],
+        columns=["Year", "Mass (Gt)", "SMB (Gt)", "D (Gt)", "SMB (Gt/yr)", "D (Gt/yr)"],
     )
     mou19 = mou19.astype(
         {
             "Year": float,
             "Mass (Gt)": float,
+            "SMB (Gt/yr)": float,
+            "D (Gt/yr)": float,
             "SMB (Gt)": float,
             "D (Gt)": float,
         }
@@ -685,6 +560,12 @@ for d, data in domain.items():
     # Normalize
     for v in ["Mass (Gt)", "D (Gt)", "SMB (Gt)"]:
         mou19[v] -= mou19[mou19["Year"] == proj_start][v].values
+
+    # Waiting for a fixed "GIS_err.csv"
+    man_d = pd.read_csv("GIS_D.csv", parse_dates=[0])
+    man = man_d
+    man["Year"] = [toYearFraction(d) for d in man_d["Date"]]
+    man = man.astype({"Discharge [Gt yr-1]": float})
 
     # Now read model output from each of the ISMIP6 files. The information we
     # need is in the file names, not the metadate so this is no fun.
@@ -755,10 +636,13 @@ for d, data in domain.items():
         m_sle = -np.hstack((hist_sle, proj_sle)) * 100
         m_sle -= np.interp(proj_start, m_time, m_sle)
         m_mass = np.hstack((hist_mass, proj_mass))
-        m_mass -= np.interp(proj_start, m_time, m_mass)
         m_smb = np.cumsum(np.hstack((hist_smb, proj_smb)))
         m_smb -= np.interp(proj_start, m_time, m_smb)
         m_d = m_mass - m_smb
+        m_mass_rate = np.gradient(np.hstack((hist_mass, proj_mass)))
+        m_smb_rate = np.hstack((hist_smb, proj_smb))
+        m_d_rate = m_mass_rate - m_smb_rate
+        m_mass -= np.interp(proj_start, m_time, m_mass)
 
         n = len(m_time)
         dfs.append(
@@ -770,13 +654,29 @@ for d, data in domain.items():
                         m_mass.reshape(-1, 1),
                         m_smb.reshape(-1, 1),
                         m_d.reshape(-1, 1),
+                        m_mass_rate.reshape(-1, 1),
+                        m_smb_rate.reshape(-1, 1),
+                        m_d_rate.reshape(-1, 1),
                         np.repeat(group, n).reshape(-1, 1),
                         np.repeat(model, n).reshape(-1, 1),
                         np.repeat(exp, n).reshape(-1, 1),
                         np.repeat(rcp, n).reshape(-1, 1),
                     ]
                 ),
-                columns=["Year", "SLE (cm)", "Mass (Gt)", "SMB (Gt)", "D (Gt)", "Group", "Model", "Exp", "RCP"],
+                columns=[
+                    "Year",
+                    "SLE (cm)",
+                    "Mass (Gt)",
+                    "SMB (Gt)",
+                    "D (Gt)",
+                    "Mass (Gt/yr)",
+                    "SMB (Gt/yr)",
+                    "D (Gt/yr)",
+                    "Group",
+                    "Model",
+                    "Exp",
+                    "RCP",
+                ],
             )
         )
         # End of working with each model run individually (the path for-loop)
@@ -790,6 +690,9 @@ for d, data in domain.items():
             "Mass (Gt)": float,
             "SMB (Gt)": float,
             "D (Gt)": float,
+            "Mass (Gt/yr)": float,
+            "SMB (Gt/yr)": float,
+            "D (Gt/yr)": float,
             "Model": str,
             "Exp": str,
             "RCP": str,
@@ -804,10 +707,8 @@ for d, data in domain.items():
     exps = []
     trends = []
     sigmas = []
-    # meet_thresh = []
     for g in df.groupby(by=["Group", "Model", "Exp"]):
         m_df = g[-1][(g[-1]["Year"] >= hist_start) & (g[-1]["Year"] <= proj_start)]
-        hist_inds = (m_time >= hist_start) & (m_time <= proj_start)
         x = m_df["Year"]
         y = m_df["Mass (Gt)"]
         X = sm.add_constant(x)
@@ -841,6 +742,9 @@ for d, data in domain.items():
             "Mass (Gt)": float,
             "SMB (Gt)": float,
             "D (Gt)": float,
+            "Mass (Gt/yr)": float,
+            "SMB (Gt/yr)": float,
+            "D (Gt/yr)": float,
             "Model": str,
             "Exp": str,
         }
@@ -865,42 +769,7 @@ for d, data in domain.items():
     # Create unique ID column Group-Model
     model_trends["Group-Model"] = model_trends["Group"] + "-" + model_trends["Model"]
 
-    # %% Compare historical trend with final outcome of sea level equivalent
-    final = df[df["Year"] == 2100].copy()
-    final["Group-Model"] = final["Group"] + "-" + final["Model"]
-    # Select those experimental results from experiments 05, 06, and 08,
-    #   which are the RCP8.5 experiments, with medium Slater ocean sensitivity
-    #   and MIROC5, NorESM and HadGEM2-ES GCMs
-
-    final_rcp85core = final.loc[final["Exp"].isin(["exp05", "exp06", "exp08"])].copy()
-    final_rcp85core = final_rcp85core.groupby(["Group-Model"]).mean()  # Take the mean of the three models
-    final_rcp85core = final_rcp85core.merge(
-        model_trends, on="Group-Model"
-    )  # Merge the 2100 mass loss with the grace trend
-
-    # fig, ax = plt.subplots()  # num="SLE v Trend", clear=True)
-    # final_rcp85core.plot(
-    #     x="Trend (Gt/yr)",
-    #     y="SLE (cm)",
-    #     kind="scatter",
-    #     ax=ax,
-    # )
-    # ax.set_xlabel(f"{hist_start}-{proj_start} Mass Loss Trend (Gt/yr)")
-    # ax.set_ylabel("2100 SLE Mass Loss (cm)")
-    # # Label the scatter plot with the Group-Model names
-    # for i in range(len(final_rcp85core)):
-    #     ax.text(final_rcp85core['Trend (Gt/yr)'].values[i],
-    #             final_rcp85core['SLE (cm)'].values[i],
-    #             final_rcp85core['Group-Model'].values.tolist()[i],
-    #             )
-    # ax.grid('on')
-
-    # %% Build Final Plots
-    # h_df = df[(df["Year"] >= hist_start) & (df["Year"] <= proj_start)]
-    plot_historical_fluxes(f"{d}_fluxes_historical.pdf", df, mou19)
+    plot_historical_partitioning_cumulative(f"{d}_historical_partitioning_cumulative.pdf", df, mou19)
+    plot_historical_partitioning(f"{d}_historical_partitioning.pdf", df, mou19, man)
     plot_historical(f"{d}_historical.pdf", df, grace, mou19, model_trends)
-    # plot_prognostic(f"{d}_prognostic.pdf", df)
-    # plot_trends(f"{d}_trends.pdf", df)
-    # plot_prognostic_w_scaling(f"{d}_prognostic_scaled.pdf", df, model_trends, grace_trend)
-    # plot_prognostic_w_as19(f"{d}_prognostic_w_as19.pdf", df, as19)
-    # plot_historical_as19(f"{d}_historical_as19.pdf", df, grace, as19)
+    plot_trends(f"{d}_trends.pdf", df)
