@@ -311,7 +311,7 @@ def plot_prognostic(out_filename, df):
     fig.savefig(out_filename, bbox_inches="tight")
 
 
-def plot_historical(out_filename, df, grace, mou19, model_trends):
+def plot_historical(out_filename, df, grace, mou19, imbie, model_trends):
     """
     Plot historical simulations and the GRACE signal.
     """
@@ -363,6 +363,15 @@ def plot_historical(out_filename, df, grace, mou19, model_trends):
         label="Observed (Mouginot et al, 2019)",
     )
 
+    imbie_line = ax.plot(
+        imbie["Year"],
+        imbie["Mass (Gt)"],
+        "-",
+        color=imbie_signal_color,
+        linewidth=imbie_signal_lw,
+        label="Observed (IMBIE)",
+    )
+
     ax.axvline(proj_start, color="k", linestyle="dashed", linewidth=grace_signal_lw)
     ax.axhline(0, color="k", linestyle="dotted", linewidth=grace_signal_lw)
     ax.text(2014.75, 4000, "Historical Period", ha="right")
@@ -370,7 +379,7 @@ def plot_historical(out_filename, df, grace, mou19, model_trends):
 
     model_line = mlines.Line2D([], [], color=simulated_signal_color, linewidth=simulated_signal_lw, label="Simulated")
 
-    legend = ax.legend(handles=[grace_line[0], mou19_line[0], model_line], loc="lower left")
+    legend = ax.legend(handles=[grace_line[0], mou19_line[0], imbie_line[0], model_line], loc="lower left")
     legend.get_frame().set_linewidth(0.0)
     legend.get_frame().set_alpha(0.0)
 
@@ -466,11 +475,14 @@ secpera = 3.15569259747e7
 
 grace_signal_lw = 0.6
 mouginot_signal_lw = 0.6
+imbie_signal_lw = 0.6
 simulated_signal_lw = 0.3
 grace_signal_color = "#084594"
 grace_sigma_color = "#9ecae1"
 mouginot_signal_color = "#a63603"
 mouginot_sigma_color = "#fdbe85"
+imbie_signal_color = "#006d2c"
+imbie_sigma_color = "#74c476"
 simulated_signal_color = "#bdbdbd"
 
 gt2cmSLE = 1.0 / 362.5 / 10.0
@@ -528,6 +540,24 @@ for d, data in domain.items():
     grace_bias = p[0]
     grace_trend = p[1]
     grace_trend_stderr = ols.bse[1]
+
+    imbie_df = pd.read_excel("imbie_dataset_greenland_dynamics-2020_02_28.xlsx", sheet_name="Greenland Ice Mass")
+    imbie = imbie_df[
+        [
+            "Year",
+            "Cumulative ice sheet mass change (Gt)",
+            "Cumulative surface mass balance anomaly (Gt)",
+            "Cumulative ice dynamics anomaly (Gt)",
+        ]
+    ].rename(
+        columns={
+            "Cumulative ice sheet mass change (Gt)": "Mass (Gt)",
+            "Cumulative surface mass balance anomaly (Gt)": "SMB (Gt)",
+            "Cumulative ice dynamics anomaly (Gt)": "D (Gt)",
+        }
+    )
+    for v in ["Mass (Gt)", "D (Gt)", "SMB (Gt)"]:
+        imbie[v] -= imbie[imbie["Year"] == proj_start][v].values
 
     mou19_df = pd.read_excel("pnas.1904242116.sd02.xlsx", sheet_name="(2) MB_GIS", header=8, usecols="B,AR:BJ")
     mou19_d = mou19_df.iloc[7]
@@ -771,5 +801,5 @@ for d, data in domain.items():
 
     plot_historical_partitioning_cumulative(f"{d}_historical_partitioning_cumulative.pdf", df, mou19)
     plot_historical_partitioning(f"{d}_historical_partitioning.pdf", df, mou19, man)
-    plot_historical(f"{d}_historical.pdf", df, grace, mou19, model_trends)
+    plot_historical(f"{d}_historical.pdf", df, grace, mou19, imbie, model_trends)
     plot_trends(f"{d}_trends.pdf", df)
