@@ -419,7 +419,7 @@ def plot_trends(out_filename, df):
         ax=ax,
         legend=False,
     )
-    ax.set_xlabel(f"{hist_start}-{proj_start} Mass Loss Trend (Gt/yr)")
+    ax.set_xlabel(f"{hist_start}-{proj_start} Mass Change Trend (Gt/yr)")
 
     ax.set_xlim(-400, 200)
     ymin = 0
@@ -438,6 +438,9 @@ def plot_trends(out_filename, df):
     ax.axvline(grace_trend + grace_trend_stderr, linestyle="dotted", color=grace_signal_color, linewidth=1)
     ax.axvline(grace_trend, linestyle="solid", color=grace_signal_color, linewidth=1)
     ax.text(-340, 2.2, "Observed (GRACE)", rotation=90, fontsize=12)
+
+    ax.axvline(0, linestyle="--", color='k', linewidth=1)
+
 
     set_size(3.2, 2.4)
     fig.savefig(out_filename, bbox_inches="tight")
