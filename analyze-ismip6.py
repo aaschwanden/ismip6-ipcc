@@ -56,7 +56,7 @@ def plot_historical_partitioning_cumulative(out_filename, df, mou19):
     def plot_smb(g):
         return ax.plot(
             g[-1]["Year"],
-            g[-1]["SMB (Gt)"],
+            g[-1]["Cumulative surface mass balance anomaly (Gt)"],
             color=simulated_signal_color,
             linewidth=simulated_signal_lw,
             linestyle="solid",
@@ -65,7 +65,7 @@ def plot_historical_partitioning_cumulative(out_filename, df, mou19):
     def plot_d(g):
         return ax.plot(
             g[-1]["Year"],
-            g[-1]["D (Gt)"],
+            g[-1]["Cumulative ice dynamics anomaly (Gt)"],
             color=simulated_signal_color,
             linewidth=simulated_signal_lw,
             linestyle="dotted",
@@ -78,16 +78,16 @@ def plot_historical_partitioning_cumulative(out_filename, df, mou19):
 
     ax.fill_between(
         mou19["Year"],
-        0.95 * mou19["SMB (Gt)"],
-        1.05 * mou19["SMB (Gt)"],
+        0.95 * mou19["Cumulative surface mass balance anomaly (Gt)"],
+        1.05 * mou19["Cumulative surface mass balance anomaly (Gt)"],
         color=mouginot_sigma_color,
         linewidth=mouginot_signal_lw,
         linestyle="solid",
     )
     ax.fill_between(
         mou19["Year"],
-        0.96 * mou19["D (Gt)"],
-        1.04 * mou19["D (Gt)"],
+        0.96 * mou19["Cumulative ice dynamics anomaly (Gt)"],
+        1.04 * mou19["Cumulative ice dynamics anomaly (Gt)"],
         color=mouginot_sigma_color,
         linewidth=mouginot_signal_lw,
         linestyle="dotted",
@@ -95,14 +95,14 @@ def plot_historical_partitioning_cumulative(out_filename, df, mou19):
 
     ax.plot(
         mou19["Year"],
-        mou19["SMB (Gt)"],
+        mou19["Cumulative surface mass balance anomaly (Gt)"],
         color=mouginot_signal_color,
         linewidth=mouginot_signal_lw,
         linestyle="solid",
     )
     ax.plot(
         mou19["Year"],
-        mou19["D (Gt)"],
+        mou19["Cumulative ice dynamics anomaly (Gt)"],
         color=mouginot_signal_color,
         linewidth=mouginot_signal_lw,
         linestyle="dotted",
@@ -149,7 +149,7 @@ def plot_historical_partitioning(out_filename, df, mou19, man):
     def plot_smb(g):
         return ax.plot(
             g[-1]["Year"],
-            g[-1]["SMB (Gt/yr)"],
+            g[-1]["Rate of surface mass balance anomaly (Gt/yr)"],
             color=simulated_signal_color,
             linewidth=simulated_signal_lw,
             linestyle="solid",
@@ -158,10 +158,10 @@ def plot_historical_partitioning(out_filename, df, mou19, man):
     def plot_d(g):
         return ax.plot(
             g[-1]["Year"],
-            g[-1]["D (Gt/yr)"],
+            g[-1]["Rate of ice dynamics anomaly (Gt/yr)"],
             color=simulated_signal_color,
             linewidth=simulated_signal_lw,
-            linestyle="dotted",
+            linestyle="dashed",
         )
 
     fig = plt.figure()
@@ -170,64 +170,129 @@ def plot_historical_partitioning(out_filename, df, mou19, man):
     [plot_d(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
 
     ax.fill_between(
+        imbie["Year"],
+        imbie["Rate of surface mass balance anomaly (Gt/yr)"]
+        - 1 * imbie["Rate of surface mass balance anomaly uncertainty (Gt/yr)"],
+        imbie["Rate of surface mass balance anomaly (Gt/yr)"]
+        + 1 * imbie["Rate of surface mass balance anomaly uncertainty (Gt/yr)"],
+        color=imbie_sigma_color,
+        alpha=0.5,
+        linewidth=0,
+    )
+
+    ax.fill_between(
+        imbie["Year"],
+        imbie["Rate of ice dynamics anomaly (Gt/yr)"] - 1 * imbie["Rate of ice dynamics anomaly uncertainty (Gt/yr)"],
+        imbie["Rate of ice dynamics anomaly (Gt/yr)"] + 1 * imbie["Rate of ice dynamics anomaly uncertainty (Gt/yr)"],
+        color=imbie_sigma_color,
+        alpha=0.5,
+        linewidth=0,
+    )
+
+    ax.fill_between(
         mou19["Year"],
-        0.95 * mou19["SMB (Gt/yr)"],
-        1.05 * mou19["SMB (Gt/yr)"],
+        0.95 * mou19["Rate of surface mass balance anomaly (Gt/yr)"],
+        1.05 * mou19["Rate of surface mass balance anomaly (Gt/yr)"],
         color=mouginot_sigma_color,
-        linewidth=mouginot_signal_lw,
-        linestyle="solid",
+        alpha=0.5,
+        linewidth=0,
     )
     ax.fill_between(
         mou19["Year"],
-        0.96 * mou19["D (Gt/yr)"],
-        1.04 * mou19["D (Gt/yr)"],
+        0.96 * mou19["Rate of ice dynamics anomaly (Gt/yr)"],
+        1.04 * mou19["Rate of ice dynamics anomaly (Gt/yr)"],
         color=mouginot_sigma_color,
-        linewidth=mouginot_signal_lw,
-        linestyle="dotted",
+        alpha=0.5,
+        linewidth=0,
     )
 
     ax.plot(
         mou19["Year"],
-        mou19["SMB (Gt/yr)"],
+        mou19["Rate of surface mass balance anomaly (Gt/yr)"],
         color=mouginot_signal_color,
         linewidth=mouginot_signal_lw,
         linestyle="solid",
     )
     ax.plot(
         mou19["Year"],
-        mou19["D (Gt/yr)"],
+        mou19["Rate of ice dynamics anomaly (Gt/yr)"],
         color=mouginot_signal_color,
         linewidth=mouginot_signal_lw,
-        linestyle="dotted",
+        linestyle="dashed",
+    )
+
+    ax.fill_between(
+        man["Year"],
+        -man["Discharge [Gt yr-1]"] - 1 * man["Discharge Error [Gt yr-1]"],
+        -man["Discharge [Gt yr-1]"] + 1 * man["Discharge Error [Gt yr-1]"],
+        color=mankoff_sigma_color,
+        alpha=0.5,
+        linewidth=0,
     )
 
     ax.plot(
         man["Year"],
         -man["Discharge [Gt yr-1]"],
-        color="#005a32",
+        color=mankoff_signal_color,
         linewidth=mouginot_signal_lw,
-        linestyle="dotted",
+        linestyle="dashed",
+    )
+
+    ax.plot(
+        imbie["Year"],
+        imbie["Rate of surface mass balance anomaly (Gt/yr)"],
+        color=imbie_signal_color,
+        linewidth=imbie_signal_lw,
+        linestyle="solid",
+    )
+    ax.plot(
+        imbie["Year"],
+        imbie["Rate of ice dynamics anomaly (Gt/yr)"],
+        color=imbie_signal_color,
+        linewidth=imbie_signal_lw,
+        linestyle="dashed",
     )
 
     ax.axvline(proj_start, color="k", linestyle="dashed", linewidth=grace_signal_lw)
     ax.axhline(0, color="k", linestyle="dotted", linewidth=grace_signal_lw)
 
     l_smb = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="solid", label="SMB")
-    l_d = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="dotted", label="D")
+    l_d = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="dashed", label="D")
     l_mou19 = mlines.Line2D(
-        [], [], color=mouginot_signal_color, linewidth=0.5, linestyle="solid", label="Observed (Mouginot et al, 2019)"
+        [],
+        [],
+        color=mouginot_signal_color,
+        linewidth=0.5,
+        linestyle="solid",
+        label="Reconstructed (Mouginot et al, 2019)",
+    )
+    l_imbie = mlines.Line2D(
+        [], [], color=imbie_signal_color, linewidth=0.5, linestyle="solid", label="Reconstructed (IMBIE)"
     )
     l_man = mlines.Line2D(
-        [], [], color="#005a32", linewidth=0.5, linestyle="solid", label="Observed (Mankoff et al, 2020)"
+        [],
+        [],
+        color=mankoff_signal_color,
+        linewidth=0.5,
+        linestyle="solid",
+        label="Reconstructed (Mankoff et al, 2020)",
     )
     l_simulated = mlines.Line2D(
         [], [], color=simulated_signal_color, linewidth=0.5, linestyle="solid", label="Simulated"
     )
-    legend_1 = ax.legend(handles=[l_smb, l_d], loc="upper left")
+    legend_1 = ax.legend(
+        handles=[l_smb, l_d], loc="upper left", bbox_to_anchor=(0.1, 0.01, 0, 0), bbox_transform=plt.gcf().transFigure
+    )
     legend_1.get_frame().set_linewidth(0.0)
     legend_1.get_frame().set_alpha(0.0)
 
-    legend_2 = ax.legend(handles=[l_mou19, l_man, l_simulated], loc="upper right")
+    legend_2 = ax.legend(
+        handles=[l_simulated, l_mou19, l_imbie, l_man],
+        loc="upper left",
+        bbox_to_anchor=(0.30, 0.01, 0, 0),
+        bbox_transform=plt.gcf().transFigure,
+    )
+    #    legend_2 = ax.legend(handles=[l_mou19, l_man, l_simulated], loc="upper right")
     legend_2.get_frame().set_linewidth(0.0)
     legend_2.get_frame().set_alpha(0.0)
 
@@ -236,7 +301,7 @@ def plot_historical_partitioning(out_filename, df, mou19, man):
     ax.add_artist(legend_1)
 
     ax.set_xlabel("Year")
-    ax.set_ylabel(f"Flux (Gt/ur)")
+    ax.set_ylabel(f"Flux (Gt/yr)")
 
     ax.set_xlim(2000, 2014)
     ymin = -750
@@ -319,14 +384,14 @@ def plot_historical(out_filename, df, grace, mou19, imbie, model_trends):
     def plot_signal(g):
         m_df = g[-1]
         x = m_df["Year"]
-        y = m_df["Mass (Gt)"]
+        y = m_df["Cumulative ice sheet mass change (Gt)"]
 
         return ax.plot(x, y, color=simulated_signal_color, linewidth=simulated_signal_lw)
 
     xmin = 2000
     xmax = 2025
     ymin = -3000
-    ymax = 5000
+    ymax = 4000
 
     fig = plt.figure(num="historical", clear=True)
     ax = fig.add_subplot(111)
@@ -335,47 +400,63 @@ def plot_historical(out_filename, df, grace, mou19, imbie, model_trends):
 
     # Plot GRACE
     ax.fill_between(
-        grace["Year"],
-        grace["Mass (Gt)"] - 2 * grace["Sigma (Gt)"],
-        grace["Mass (Gt)"] + 2 * grace["Sigma (Gt)"],
-        color=grace_sigma_color,
-    )
-    grace_line = ax.plot(
-        grace["Year"],
-        grace["Mass (Gt)"],
-        "-",
-        color=grace_signal_color,
-        linewidth=grace_signal_lw,
-        label="Observed (GRACE)",
-    )
-    ax.fill_between(
         mou19["Year"],
-        (1 - 0.057) * mou19["Mass (Gt)"],
-        (1 + 0.057) * mou19["Mass (Gt)"],
+        (1 - 0.057) * mou19["Cumulative ice sheet mass change (Gt)"],
+        (1 + 0.057) * mou19["Cumulative ice sheet mass change (Gt)"],
         color=mouginot_sigma_color,
+        alpha=0.5,
+        linewidth=0,
     )
     mou19_line = ax.plot(
         mou19["Year"],
-        mou19["Mass (Gt)"],
+        mou19["Cumulative ice sheet mass change (Gt)"],
         "-",
         color=mouginot_signal_color,
         linewidth=mouginot_signal_lw,
         label="Observed (Mouginot et al, 2019)",
     )
 
+    ax.fill_between(
+        imbie["Year"],
+        imbie["Cumulative ice sheet mass change (Gt)"]
+        - 1 * imbie["Cumulative ice sheet mass change uncertainty (Gt)"],
+        imbie["Cumulative ice sheet mass change (Gt)"]
+        + 1 * imbie["Cumulative ice sheet mass change uncertainty (Gt)"],
+        color=imbie_sigma_color,
+        alpha=0.5,
+        linewidth=0,
+    )
     imbie_line = ax.plot(
         imbie["Year"],
-        imbie["Mass (Gt)"],
+        imbie["Cumulative ice sheet mass change (Gt)"],
         "-",
         color=imbie_signal_color,
         linewidth=imbie_signal_lw,
         label="Observed (IMBIE)",
     )
 
+    ax.fill_between(
+        grace["Year"],
+        grace["Cumulative ice sheet mass change (Gt)"]
+        - 1 * grace["Cumulative ice sheet mass change uncertainty (Gt)"],
+        grace["Cumulative ice sheet mass change (Gt)"]
+        + 1 * grace["Cumulative ice sheet mass change uncertainty (Gt)"],
+        color=grace_sigma_color,
+        alpha=0.5,
+        linewidth=0,
+    )
+    grace_line = ax.plot(
+        grace["Year"],
+        grace["Cumulative ice sheet mass change (Gt)"],
+        "-",
+        color=grace_signal_color,
+        linewidth=grace_signal_lw,
+        label="Observed (GRACE)",
+    )
     ax.axvline(proj_start, color="k", linestyle="dashed", linewidth=grace_signal_lw)
     ax.axhline(0, color="k", linestyle="dotted", linewidth=grace_signal_lw)
-    ax.text(2014.75, 4000, "Historical Period", ha="right")
-    ax.text(2015.25, 4000, "Projection Period", ha="left")
+    ax.text(2014.75, 3000, "Historical Period", ha="right")
+    ax.text(2015.25, 3000, "Projection Period", ha="left")
 
     model_line = mlines.Line2D([], [], color=simulated_signal_color, linewidth=simulated_signal_lw, label="Simulated")
 
@@ -439,8 +520,7 @@ def plot_trends(out_filename, df):
     ax.axvline(grace_trend, linestyle="solid", color=grace_signal_color, linewidth=1)
     ax.text(-340, 2.2, "Observed (GRACE)", rotation=90, fontsize=12)
 
-    ax.axvline(0, linestyle="--", color='k', linewidth=1)
-
+    ax.axvline(0, linestyle="--", color="k", linewidth=1)
 
     set_size(3.2, 2.4)
     fig.savefig(out_filename, bbox_inches="tight")
@@ -476,17 +556,19 @@ plt.rcParams.update(params)
 
 secpera = 3.15569259747e7
 
-grace_signal_lw = 0.6
-mouginot_signal_lw = 0.6
-imbie_signal_lw = 0.6
+grace_signal_lw = 0.75
+mouginot_signal_lw = 0.75
+imbie_signal_lw = 0.75
 simulated_signal_lw = 0.3
 grace_signal_color = "#084594"
 grace_sigma_color = "#9ecae1"
 mouginot_signal_color = "#a63603"
 mouginot_sigma_color = "#fdbe85"
-imbie_signal_color = "#006d2c"
-imbie_sigma_color = "#74c476"
-simulated_signal_color = "#bdbdbd"
+imbie_signal_color = "#005a32"
+imbie_sigma_color = "#a1d99b"
+mankoff_signal_color = "#54278f"
+mankoff_sigma_color = "#bcbddc"
+simulated_signal_color = "0.7"
 
 gt2cmSLE = 1.0 / 362.5 / 10.0
 
@@ -526,17 +608,23 @@ for d, data in domain.items():
 
     # Load the GRACE data
     grace = pd.read_csv(
-        data, header=30, delim_whitespace=True, skipinitialspace=True, names=["Year", "Mass (Gt)", "Sigma (Gt)"]
+        data,
+        header=30,
+        delim_whitespace=True,
+        skipinitialspace=True,
+        names=["Year", "Cumulative ice sheet mass change (Gt)", "Cumulative ice sheet mass change uncertainty (Gt)"],
     )
     # Normalize GRACE signal to the starting date of the projection
-    grace["Mass (Gt)"] -= np.interp(proj_start, grace["Year"], grace["Mass (Gt)"])
+    grace["Cumulative ice sheet mass change (Gt)"] -= np.interp(
+        proj_start, grace["Year"], grace["Cumulative ice sheet mass change (Gt)"]
+    )
 
     # Get the GRACE trend
     grace_time = (grace["Year"] >= hist_start) & (grace["Year"] <= proj_start)
     grace_hist_df = grace[grace_time]
     x = grace_hist_df["Year"]
-    y = grace_hist_df["Mass (Gt)"]
-    s = grace_hist_df["Sigma (Gt)"]
+    y = grace_hist_df["Cumulative ice sheet mass change (Gt)"]
+    s = grace_hist_df["Cumulative ice sheet mass change uncertainty (Gt)"]
     X = sm.add_constant(x)
     ols = sm.OLS(y, X).fit()
     p = ols.params
@@ -549,18 +637,36 @@ for d, data in domain.items():
         [
             "Year",
             "Cumulative ice sheet mass change (Gt)",
+            "Cumulative ice sheet mass change uncertainty (Gt)",
             "Cumulative surface mass balance anomaly (Gt)",
+            "Cumulative surface mass balance anomaly uncertainty (Gt)",
             "Cumulative ice dynamics anomaly (Gt)",
+            "Cumulative ice dynamics anomaly uncertainty (Gt)",
+            "Rate of mass balance anomaly (Gt/yr)",
+            "Rate of ice dynamics anomaly (Gt/yr)",
+            "Rate of mass balance anomaly uncertainty (Gt/yr)",
+            "Rate of ice dyanamics anomaly uncertainty (Gt/yr)",
         ]
     ].rename(
         columns={
-            "Cumulative ice sheet mass change (Gt)": "Mass (Gt)",
-            "Cumulative surface mass balance anomaly (Gt)": "SMB (Gt)",
-            "Cumulative ice dynamics anomaly (Gt)": "D (Gt)",
+            "Rate of mass balance anomaly (Gt/yr)": "Rate of surface mass balance anomaly (Gt/yr)",
+            "Rate of mass balance anomaly uncertainty (Gt/yr)": "Rate of surface mass balance anomaly uncertainty (Gt/yr)",
+            "Rate of ice dyanamics anomaly uncertainty (Gt/yr)": "Rate of ice dynamics anomaly uncertainty (Gt/yr)",
         }
     )
-    for v in ["Mass (Gt)", "D (Gt)", "SMB (Gt)"]:
+
+    for v in [
+        "Cumulative ice sheet mass change (Gt)",
+        "Cumulative ice dynamics anomaly (Gt)",
+        "Cumulative surface mass balance anomaly (Gt)",
+    ]:
         imbie[v] -= imbie[imbie["Year"] == proj_start][v].values
+
+    s = imbie[(imbie["Year"] >= 1980) & (imbie["Year"] < 1990)]
+    mass_mean = s["Cumulative ice sheet mass change (Gt)"].mean() / (1990 - 1980)
+    smb_mean = s["Cumulative surface mass balance anomaly (Gt)"].mean() / (1990 - 1980)
+    imbie[f"Rate of surface mass balance anomaly (Gt/yr)"] += 2 * 1964 / 10
+    imbie[f"Rate of ice dynamics anomaly (Gt/yr)"] -= 2 * 1964 / 10
 
     mou19_df = pd.read_excel("pnas.1904242116.sd02.xlsx", sheet_name="(2) MB_GIS", header=8, usecols="B,AR:BJ")
     mou19_d = mou19_df.iloc[7]
@@ -577,28 +683,41 @@ for d, data in domain.items():
                 -mou19_d.values[1::].reshape(-1, 1),
             ]
         ),
-        columns=["Year", "Mass (Gt)", "SMB (Gt)", "D (Gt)", "SMB (Gt/yr)", "D (Gt/yr)"],
+        columns=[
+            "Year",
+            "Cumulative ice sheet mass change (Gt)",
+            "Cumulative surface mass balance anomaly (Gt)",
+            "Cumulative ice dynamics anomaly (Gt)",
+            "Rate of surface mass balance anomaly (Gt/yr)",
+            "Rate of ice dynamics anomaly (Gt/yr)",
+        ],
     )
     mou19 = mou19.astype(
         {
             "Year": float,
-            "Mass (Gt)": float,
-            "SMB (Gt/yr)": float,
-            "D (Gt/yr)": float,
-            "SMB (Gt)": float,
-            "D (Gt)": float,
+            "Cumulative ice sheet mass change (Gt)": float,
+            "Cumulative surface mass balance anomaly (Gt)": float,
+            "Cumulative ice dynamics anomaly (Gt)": float,
+            "Rate of surface mass balance anomaly (Gt/yr)": float,
+            "Rate of ice dynamics anomaly (Gt/yr)": float,
         }
     )
 
     # Normalize
-    for v in ["Mass (Gt)", "D (Gt)", "SMB (Gt)"]:
+    for v in [
+        "Cumulative ice sheet mass change (Gt)",
+        "Cumulative ice dynamics anomaly (Gt)",
+        "Cumulative surface mass balance anomaly (Gt)",
+    ]:
         mou19[v] -= mou19[mou19["Year"] == proj_start][v].values
 
-    # Waiting for a fixed "GIS_err.csv"
     man_d = pd.read_csv("GIS_D.csv", parse_dates=[0])
-    man = man_d
-    man["Year"] = [toYearFraction(d) for d in man_d["Date"]]
-    man = man.astype({"Discharge [Gt yr-1]": float})
+    man_d["Year"] = [toYearFraction(d) for d in man_d["Date"]]
+    man_d = man_d.astype({"Discharge [Gt yr-1]": float})
+    man_err = pd.read_csv("GIS_err.csv", parse_dates=[0])
+    man_err["Year"] = [toYearFraction(d) for d in man_err["Date"]]
+    man_err = man_err.astype({"Discharge Error [Gt yr-1]": float})
+    man = pd.merge(man_d, man_err, on="Year").drop(columns=["Date_x", "Date_y"])
 
     # Now read model output from each of the ISMIP6 files. The information we
     # need is in the file names, not the metadate so this is no fun.
@@ -699,12 +818,12 @@ for d, data in domain.items():
                 columns=[
                     "Year",
                     "SLE (cm)",
-                    "Mass (Gt)",
-                    "SMB (Gt)",
-                    "D (Gt)",
-                    "Mass (Gt/yr)",
-                    "SMB (Gt/yr)",
-                    "D (Gt/yr)",
+                    "Cumulative ice sheet mass change (Gt)",
+                    "Cumulative surface mass balance anomaly (Gt)",
+                    "Cumulative ice dynamics anomaly (Gt)",
+                    "Rate of ice sheet mass change (Gt/yr)",
+                    "Rate of surface mass balance anomaly (Gt/yr)",
+                    "Rate of ice dynamics anomaly (Gt/yr)",
                     "Group",
                     "Model",
                     "Exp",
@@ -720,12 +839,12 @@ for d, data in domain.items():
         {
             "Year": float,
             "SLE (cm)": float,
-            "Mass (Gt)": float,
-            "SMB (Gt)": float,
-            "D (Gt)": float,
-            "Mass (Gt/yr)": float,
-            "SMB (Gt/yr)": float,
-            "D (Gt/yr)": float,
+            "Cumulative ice sheet mass change (Gt)": float,
+            "Cumulative surface mass balance anomaly (Gt)": float,
+            "Cumulative ice dynamics anomaly (Gt)": float,
+            "Rate of ice sheet mass change (Gt/yr)": float,
+            "Rate of surface mass balance anomaly (Gt/yr)": float,
+            "Rate of ice dynamics anomaly (Gt/yr)": float,
             "Model": str,
             "Exp": str,
             "RCP": str,
@@ -743,7 +862,7 @@ for d, data in domain.items():
     for g in df.groupby(by=["Group", "Model", "Exp"]):
         m_df = g[-1][(g[-1]["Year"] >= hist_start) & (g[-1]["Year"] <= proj_start)]
         x = m_df["Year"]
-        y = m_df["Mass (Gt)"]
+        y = m_df["Cumulative ice sheet mass change (Gt)"]
         X = sm.add_constant(x)
         ols = sm.OLS(y, X).fit()
         p = ols.params
@@ -772,12 +891,12 @@ for d, data in domain.items():
         {
             "Year": float,
             "SLE (cm)": float,
-            "Mass (Gt)": float,
-            "SMB (Gt)": float,
-            "D (Gt)": float,
-            "Mass (Gt/yr)": float,
-            "SMB (Gt/yr)": float,
-            "D (Gt/yr)": float,
+            "Cumulative ice sheet mass change (Gt)": float,
+            "Cumulative surface mass balance anomaly (Gt)": float,
+            "Cumulative ice dynamics anomaly (Gt)": float,
+            "Rate of ice sheet mass change (Gt/yr)": float,
+            "Rate of surface mass balance anomaly (Gt/yr)": float,
+            "Rate of ice dynamics anomaly (Gt/yr)": float,
             "Model": str,
             "Exp": str,
         }
