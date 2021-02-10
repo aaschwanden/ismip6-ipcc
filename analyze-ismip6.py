@@ -52,6 +52,19 @@ def toYearFraction(date):
     return date.year + fraction
 
 
+def plot_sle_pdfs(out_filename, df, as19):
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    sns.kdeplot(data=df, x="SLE (cm)", hue="RCP", hue_order=["26", "85"], palette=["#003466", "#990002"], ax=ax)
+    sns.kdeplot(
+        data=as19, x="SLE (cm)", hue="RCP", hue_order=[26, 85], palette=["#003466", "#990002"], fill=True, ax=ax
+    )
+
+    set_size(4.7, 2)
+    fig.savefig(out_filename, bbox_inches="tight")
+
+
 def plot_historical_partitioning_cumulative(out_filename, df, mou19):
     def plot_smb(g):
         return ax.plot(
@@ -312,7 +325,7 @@ def plot_historical_partitioning(out_filename, df, mou19, man):
     fig.savefig(out_filename, bbox_inches="tight")
 
 
-def plot_prognostic(out_filename, df):
+def plot_prognostic(out_filename, df, as19):
     """
     Plot model projections
     """
@@ -321,9 +334,8 @@ def plot_prognostic(out_filename, df):
     xmin = np.floor(df[df["Year"] >= proj_start]["SLE (cm)"].min())
     xmax = np.ceil(df[df["Year"] >= proj_start]["SLE (cm)"].max())
 
-    # Dataframe with Year 2100 only for histogram
-    p_df = df[(df["Year"] == 2100) & (df["Meet_Threshold"] == True)]
-    f_df = df[(df["Year"] == 2100) & (df["Meet_Threshold"] == False)]
+    xmin = -5
+    xmax = 16
 
     fig, ax = plt.subplots(
         1,
@@ -336,29 +348,28 @@ def plot_prognostic(out_filename, df):
     )
     fig.subplots_adjust(wspace=0.025)
 
-    def plot_signal(g):
-        if g[-1]["Meet_Threshold"].any() == True:
-            signal_color = "#74c476"
+    def plot_signal(g, *kwargs):
+        if g[-1]["RCP"].any() == "85":
+            signal_color = rcp_col_dict[85]
         else:
-            signal_color = "0.5"
+            signal_color = rcp_col_dict[26]
 
-        return ax[0].plot(g[-1]["Year"], g[-1]["SLE (cm)"], color=signal_color, linewidth=0.5)
+        return ax[0].plot(g[-1]["Year"], g[-1]["SLE (cm)"], color=signal_color, linewidth=0.5, alpha=0.5, *kwargs)
 
     # Plot each model response by grouping
     [plot_signal(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
 
     ## Boxplot
-    sns.boxplot(
+    sns.kdeplot(
         data=df[df["Year"] == 2100],
-        x="Meet_Threshold",
         y="SLE (cm)",
-        hue="Meet_Threshold",
-        palette=["0.5", "#238b45"],
-        width=0.8,
+        hue="RCP",
+        hue_order=["26", "85"],
+        palette=[rcp_col_dict[26], rcp_col_dict[85]],
         linewidth=0.75,
-        fliersize=0.40,
         ax=ax[1],
     )
+
     sns.despine(ax=ax[1], left=True, bottom=True)
     try:
         ax[1].get_legend().remove()
@@ -470,7 +481,7 @@ def plot_historical(out_filename, df, grace, mou19, imbie, model_trends):
     ax.set_xlim(xmin, xmax)
     ax.set_ylim(ymin, ymax)
     ax_sle = ax.twinx()
-    ax_sle.set_ylabel(f"Contribution to SLE\nsince {proj_start} (cm)")
+    ax_sle.set_ylabel(f"Contribution to sea-level \nsince {proj_start} (cm SLE)")
     ax_sle.set_ylim(-ymin * gt2cmSLE, -ymax * gt2cmSLE)
 
     set_size(5, 2)
@@ -572,6 +583,8 @@ simulated_signal_color = "0.7"
 
 gt2cmSLE = 1.0 / 362.5 / 10.0
 
+rcp_list = ["26", "45", "85"]
+rcp_col_dict = {"CTRL": "k", 85: "#990002", 45: "#5492CD", 26: "#003466"}
 
 # Where the ISMIP6 simulations reside
 basedir = "v7_CMIP5_pub"
@@ -601,7 +614,9 @@ proj_time = np.arange(proj_start, proj_end + 1)
 tolerance = 0.25
 
 # Greenland only though this could easily be extended to Antarctica
-domain = {"GIS": "greenland_mass_200204_202008.txt"}
+domain = {"GIS": "grace/greenland_mass_200204_202008.txt"}
+
+remove_ctrl = True
 
 for d, data in domain.items():
     print(f"Analyzing {d}")
@@ -632,7 +647,13 @@ for d, data in domain.items():
     grace_trend = p[1]
     grace_trend_stderr = ols.bse[1]
 
-    imbie_df = pd.read_excel("imbie_dataset_greenland_dynamics-2020_02_28.xlsx", sheet_name="Greenland Ice Mass")
+    as19 = pd.read_csv("as19/aschwanden_et_al_2019_les_2008_norm.csv.gz")
+    as19["SLE (cm)"] = -as19["Mass (Gt)"] / 362.5 / 10
+    as19 = as19.astype({"RCP": int, "Experiment": int})
+
+    imbie_df = pd.read_excel(
+        "imbie/imbie_dataset_greenland_dynamics-2020_02_28.xlsx", sheet_name="Greenland Ice Mass", engine="openpyxl"
+    )
     imbie = imbie_df[
         [
             "Year",
@@ -668,7 +689,9 @@ for d, data in domain.items():
     imbie[f"Rate of surface mass balance anomaly (Gt/yr)"] += 2 * 1964 / 10
     imbie[f"Rate of ice dynamics anomaly (Gt/yr)"] -= 2 * 1964 / 10
 
-    mou19_df = pd.read_excel("pnas.1904242116.sd02.xlsx", sheet_name="(2) MB_GIS", header=8, usecols="B,AR:BJ")
+    mou19_df = pd.read_excel(
+        "mouginot/pnas.1904242116.sd02.xlsx", sheet_name="(2) MB_GIS", header=8, usecols="B,AR:BJ", engine="openpyxl"
+    )
     mou19_d = mou19_df.iloc[7]
     mou19_smb = mou19_df.iloc[19]
     mou19_mass = mou19_df.iloc[41]
@@ -711,10 +734,10 @@ for d, data in domain.items():
     ]:
         mou19[v] -= mou19[mou19["Year"] == proj_start][v].values
 
-    man_d = pd.read_csv("GIS_D.csv", parse_dates=[0])
+    man_d = pd.read_csv("mankoff/GIS_D.csv", parse_dates=[0])
     man_d["Year"] = [toYearFraction(d) for d in man_d["Date"]]
     man_d = man_d.astype({"Discharge [Gt yr-1]": float})
-    man_err = pd.read_csv("GIS_err.csv", parse_dates=[0])
+    man_err = pd.read_csv("mankoff/GIS_err.csv", parse_dates=[0])
     man_err["Year"] = [toYearFraction(d) for d in man_err["Date"]]
     man_err = man_err.astype({"Discharge Error [Gt yr-1]": float})
     man = pd.merge(man_d, man_err, on="Year").drop(columns=["Date_x", "Date_y"])
@@ -775,8 +798,14 @@ for d, data in domain.items():
         with the SMB fixed to 1960-1989 levels (no anomaly in SMB) and no change in ice sheet mask.
         So ctrl after the historical spinup represents an abrupt return to an earlier SMB forcing in 2015.
         """
-        proj_sle = exp_sle
-        proj_mass = exp_mass
+
+        if remove_ctrl:
+            proj_sle = exp_sle
+            proj_mass = exp_mass
+        else:
+            proj_sle = exp_sle + ctrl_sle
+            proj_mass = exp_mass + ctrl_mass
+
         proj_smb = exp_smb
 
         # Historical simulations start at different years since initialization was left
@@ -921,7 +950,20 @@ for d, data in domain.items():
     # Create unique ID column Group-Model
     model_trends["Group-Model"] = model_trends["Group"] + "-" + model_trends["Model"]
 
+    plot_prognostic(f"{d}_prognostic.pdf", df, as19)
+    plot_sle_pdfs(f"{d}_sle_pdf_2100.pdf", df[df["Year"] == 2100], as19[(as19["Year"] == 2100) & (as19["RCP"] != 45)])
     plot_historical_partitioning_cumulative(f"{d}_historical_partitioning_cumulative.pdf", df, mou19)
     plot_historical_partitioning(f"{d}_historical_partitioning.pdf", df, mou19, man)
     plot_historical(f"{d}_historical.pdf", df, grace, mou19, imbie, model_trends)
     plot_trends(f"{d}_trends.pdf", df)
+
+    def iqr(df, col):
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        return IQR
+
+    f = as19[as19["Year"] == 2100]
+    f.groupby(by=["RCP"]).apply(iqr, "SLE (cm)")
+
+    df[df["Year"] == 2100].groupby(by=["RCP"]).apply(iqr, "SLE (cm)")
