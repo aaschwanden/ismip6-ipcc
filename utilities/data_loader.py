@@ -200,7 +200,7 @@ def load_ismip6():
         df = pd.read_csv(ismip6_filename)
     else:
         print(f"{ismip6_filename} not found locally. Downloading.")
-        ismip6_to_csv(basedir="v7_CMIP5_pub", ismip6_filename)
+        ismip6_to_csv("v7_CMIP5_pub", ismip6_filename)
         df = pd.read_csv(ismip6_filename)
     return df
 
