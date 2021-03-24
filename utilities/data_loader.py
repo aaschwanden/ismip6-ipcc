@@ -200,12 +200,12 @@ def load_ismip6():
         df = pd.read_csv(ismip6_filename)
     else:
         print(f"{ismip6_filename} not found locally. Downloading.")
-        ismip6_to_csv(basedir="v7_CMIP5_pub")
+        ismip6_to_csv(basedir="v7_CMIP5_pub", ismip6_filename)
         df = pd.read_csv(ismip6_filename)
     return df
 
 
-def ismip6_to_csv(basedir):
+def ismip6_to_csv(basedir, ismip6_filename):
     # Now read model output from each of the ISMIP6 files. The information we
     # need is in the file names, not the metadate so this is no fun.
     # Approach is to read each dataset into a dataframe, then concatenate all
