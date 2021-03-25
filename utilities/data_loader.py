@@ -1,9 +1,10 @@
+import netrc
+import getpass
 import numpy as np
 import pandas as pd
 import os
 import requests
-import netrc
-import getpass
+from requests.auth import HTTPDigestAuth
 from urllib.parse import urlparse
 from urllib.request import HTTPError
 from urllib.request import urlopen
@@ -172,8 +173,9 @@ def load_mouginot():
 
 
 def load_grace():
+
     grace = pd.read_csv(
-        "https://podaac-tools.jpl.nasa.gov/drive/files/allData/tellus/L4/ice_mass/RL06/v02/mascon_CRI/greenland_mass_200204_202101.txt",
+        "greenland_mass_200204_202101.txt",
         header=30,
         delim_whitespace=True,
         skipinitialspace=True,
