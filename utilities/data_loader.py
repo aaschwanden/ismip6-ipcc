@@ -175,7 +175,7 @@ def load_mouginot():
 def load_grace():
 
     grace = pd.read_csv(
-        "greenland_mass_200204_202101.txt",
+        "grace/greenland_mass_200204_202102.txt",
         header=30,
         delim_whitespace=True,
         skipinitialspace=True,
