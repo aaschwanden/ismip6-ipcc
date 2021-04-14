@@ -191,18 +191,20 @@ def load_grace():
 
 def load_ismip6():
     outpath = "."
-    url = "https://zenodo.org/record/3939037/files/v7_CMIP5_pub.zip"
-
-    with urlopen(url) as zipresp:
-        with ZipFile(BytesIO(zipresp.read())) as zfile:
-            zfile.extractall(outpath)
+    v_dir = "v7_CMIP5_pub"
+    url = f"https://zenodo.org/record/3939037/files/{v_dir}.zip"
 
     ismip6_filename = "ismip6_gris_ctrl_removed.csv.gz"
     if os.path.isfile(ismip6_filename):
         df = pd.read_csv(ismip6_filename)
     else:
-        print(f"{ismip6_filename} not found locally. Downloading.")
-        ismip6_to_csv("v7_CMIP5_pub", ismip6_filename)
+        print(f"{ismip6_filename} not found locally. Downloading the ISMIP6 archive.")
+        if not os.path.isfile(f"{v_dir}.zip"):
+            with urlopen(url) as zipresp:
+                with ZipFile(BytesIO(zipresp.read())) as zfile:
+                    zfile.extractall(outpath)
+        print("   ...and converting to CSV")
+        ismip6_to_csv(v_dir, ismip6_filename)
         df = pd.read_csv(ismip6_filename)
     return df
 
@@ -222,10 +224,8 @@ def ismip6_to_csv(basedir, ismip6_filename):
     for path in Path(basedir).rglob("*_mm_*_historical.nc"):
         hist_files.append(path)
 
-    files = []
     dfs = []
     for path in Path(basedir).rglob("*_mm_cr_*.nc"):
-        files.append(path)
         # Experiment
         nc = NC(path)
         exp_sle = nc.variables["sle"][:]
