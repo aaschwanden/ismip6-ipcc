@@ -189,7 +189,27 @@ def load_grace():
     return grace
 
 
-def load_ismip6():
+def load_ismip6_ant():
+    outpath = "."
+    v_dir = "ComputedScalarsPaper"
+    url = "https://zenodo.org/record/3940766/files/ComputedScalarsPaper.zip"
+
+    ismip6_filename = "ismip6_ant_ctrl_removed.csv.gz"
+    if os.path.isfile(ismip6_filename):
+        df = pd.read_csv(ismip6_filename)
+    else:
+        print(f"{ismip6_filename} not found locally. Downloading the ISMIP6 archive.")
+        if not os.path.isfile(f"{v_dir}.zip"):
+            with urlopen(url) as zipresp:
+                with ZipFile(BytesIO(zipresp.read())) as zfile:
+                    zfile.extractall(outpath)
+        print("   ...and converting to CSV")
+        ismip6_to_csv(v_dir, ismip6_filename)
+        df = pd.read_csv(ismip6_filename)
+    return df
+
+
+def load_ismip6_gris():
     outpath = "."
     v_dir = "v7_CMIP5_pub"
     url = f"https://zenodo.org/record/3939037/files/{v_dir}.zip"
