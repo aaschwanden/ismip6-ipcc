@@ -194,7 +194,7 @@ def plot_historical(out_filename, df, df_ctrl, grace):
     ymin = -20000
     ymax = 1000
 
-    fig = plt.figure(num="historical", clear=True)
+    fig = plt.figure(num="historical", clear=True, figsize=[6.2, 2.5])
     ax = fig.add_subplot(111)
 
     # [plot_signal(g) for g in df.groupby(by=["Experiment"])]
@@ -271,8 +271,6 @@ def plot_historical(out_filename, df, df_ctrl, grace):
     ax_sle.set_ylabel(f"Contribution to sea-level \nsince {proj_start} (cm SLE)")
     ax_sle.set_ylim(-ymin * gt2cmSLE, -ymax * gt2cmSLE)
 
-    set_size(5, 2.5)
-
     fig.savefig(out_filename, bbox_inches="tight")
 
 
@@ -290,17 +288,17 @@ def plot_projection(out_filename, df, df_ctrl, grace):
 
     xmin = 2020
     xmax = 2100
-    ymin = -120000
-    ymax = 1000
+    ymin = -100000
+    ymax = 0
 
     fig, ax = plt.subplots(
         1,
         2,
         sharey="col",
-        figsize=[6.2, 2.0],
+        figsize=[6.2, 2.5],
         num="prognostic_all",
         clear=True,
-        gridspec_kw=dict(width_ratios=[20, 1]),
+        gridspec_kw=dict(width_ratios=[20, 1.5]),
     )
     fig.subplots_adjust(wspace=0.025)
 
@@ -324,17 +322,6 @@ def plot_projection(out_filename, df, df_ctrl, grace):
         label="Simulated (AS19) 90% c.i.",
     )
 
-    ax[0].fill_between(
-        grace["Year"],
-        grace["Cumulative ice sheet mass change (Gt)"]
-        - 1 * grace["Cumulative ice sheet mass change uncertainty (Gt)"],
-        grace["Cumulative ice sheet mass change (Gt)"]
-        + 1 * grace["Cumulative ice sheet mass change uncertainty (Gt)"],
-        color=grace_sigma_color,
-        alpha=0.5,
-        linewidth=0,
-    )
-
     l_es_mean = ax[0].plot(
         as19_mean.index,
         as19_mean["Cumulative ice sheet mass change (Gt)"],
@@ -351,23 +338,36 @@ def plot_projection(out_filename, df, df_ctrl, grace):
         label="Mean(CTRL)",
     )
 
-    grace_line = ax[0].plot(
-        grace["Year"],
-        grace["Cumulative ice sheet mass change (Gt)"],
-        "-",
-        color=grace_signal_color,
-        linewidth=grace_signal_lw,
-        label="Observed (GRACE)",
-    )
-    # ax[0].axhline(0, color="k", linestyle="dotted", linewidth=grace_signal_lw)
+    def plot_signal(g):
+        m_df = g[-1]
+        x = m_df["Year"]
+        y = m_df["Mass (Gt)"]
+
+        return ax[0].plot(x, y, color=simulated_signal_color, linewidth=simulated_signal_lw)
+
+    cmap = sns.color_palette("mako_r", n_colors=4)
+    l_bs = []
+    for beta in [3, 2, 1]:
+        m_df = df[df[f"Mass Trend {beta}-sigma (Gt/yr)"] == True]
+        as19_mean = m_df.groupby(by="Year").mean()
+        l = ax[0].plot(
+            as19_mean.index, as19_mean["Mass (Gt)"], color=cmap[beta], linewidth=grace_signal_lw, label=f"{beta}-sigma"
+        )
+        l_bs.append(l[0])
 
     model_line = mlines.Line2D(
         [], [], color=simulated_signal_color, linewidth=simulated_signal_lw, label="Simulated (AS19)"
     )
 
-    legend = ax[0].legend(handles=[grace_line[0], l_ctrl_mean[0], l_es_mean[0], as19_ci], loc="lower left")
+    legend = ax[0].legend(handles=[l_ctrl_mean[0], l_es_mean[0], as19_ci], loc="lower left")
     legend.get_frame().set_linewidth(0.0)
     legend.get_frame().set_alpha(0.0)
+
+    legend_2 = ax[0].legend(handles=l_bs, title="Calibrated", loc="lower right")
+    legend_2.get_frame().set_linewidth(0.0)
+    legend_2.get_frame().set_alpha(0.0)
+
+    ax[0].add_artist(legend)
 
     ax[0].set_xlabel("Year")
     ax[0].set_ylabel(f"Cumulative mass change\nsince {proj_start} (Gt)")
@@ -375,8 +375,6 @@ def plot_projection(out_filename, df, df_ctrl, grace):
     ax[0].set_xlim(xmin, xmax)
     ax[0].set_ylim(ymin, ymax)
 
-    cmap = sns.color_palette("rocket_r", n_colors=4)
-    print(cmap)
     df_2100 = df[df["Year"] == 2100]
     sns.kdeplot(
         data=df_2100,
@@ -389,7 +387,7 @@ def plot_projection(out_filename, df, df_ctrl, grace):
             data=df_2100[df_2100[f"Mass Trend {beta}-sigma (Gt/yr)"] == True],
             y="Mass (Gt)",
             ax=ax[1],
-            palette="rocket",
+            color=cmap[beta],
         )
 
     sns.despine(ax=ax[1], left=True, bottom=True)
