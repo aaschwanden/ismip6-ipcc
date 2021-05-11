@@ -201,6 +201,7 @@ def plot_historical(out_filename, df, df_ctrl, grace):
 
     as19_mean = df.groupby(by="Year").mean()
     as19_std = df.groupby(by="Year").std()
+
     as19_low = df.groupby(by="Year").quantile(0.05)
     as19_high = df.groupby(by="Year").quantile(0.95)
 
@@ -269,12 +270,19 @@ def plot_projection(out_filename, df, df_ctrl, grace):
 
         return ax.plot(x, y, color="0.6", alpha=0.3, linewidth=simulated_signal_lw)
 
-    def plot_ctrl(g, rcp):
+    def plot_ctrl(g, rcp, ls):
         m_df = g[-1]
         x = m_df["Year"]
-        y = m_df["Mass (Gt)"]
+        y = m_df["Cumulative ice sheet mass change (Gt)"]
 
-        return ax.plot(x, y, color=rcp_col_dict[rcp], alpha=1.0, linewidth=grace_signal_lw)
+        return ax.plot(x, y, color=rcp_col_dict[rcp], alpha=1.0, linewidth=grace_signal_lw, linestyle=ls)
+
+    def plot_quantiles(g, rcp, ls):
+        m_df = g
+        x = m_df["Year"]
+        y = m_df["Cumulative ice sheet mass change (Gt)"]
+
+        return ax.plot(x, y, color=rcp_col_dict[rcp], alpha=1.0, linewidth=grace_signal_lw, linestyle=ls)
 
     xmin = 2005
     xmax = 2025
@@ -288,13 +296,17 @@ def plot_projection(out_filename, df, df_ctrl, grace):
     for rcp in [26, 45, 85]:
         pdf = df[df["RCP"] == rcp]
         pdf_ctrl = df_ctrl[df_ctrl["RCP"] == rcp]
-        [plot_signal(g, rcp) for g in pdf.groupby(by=["Experiment"])]
-        [plot_ctrl(g, rcp) for g in pdf_ctrl.groupby(by=["Experiment"])]
+        [
+            plot_ctrl(g, rcp, "solid")
+            for g in pdf.drop(columns=["Experiment"]).groupby(by=["Year"]).quantile(0.50).reset_index()
+        ]
+        [plot_ctrl(g, rcp, "dashed") for g in pdf_ctrl.groupby(by=["Experiment"])]
 
     as19_mean = df.groupby(by="Year").mean()
     as19_std = df.groupby(by="Year").std()
     as19_low = df.groupby(by="Year").quantile(0.05)
     as19_high = df.groupby(by="Year").quantile(0.95)
+    as19_median = df.groupby(by="Year").quantile(0.50)
 
     # as19_ci = ax.fill_between(
     #     as19_mean.index,
