@@ -199,22 +199,22 @@ def plot_historical(out_filename, df, df_ctrl, grace):
 
     # [plot_signal(g) for g in df.groupby(by=["Experiment"])]
 
-    as19_mean = df.groupby(by="Year").mean()
+    as19_median = df.drop(columns=["interval"]).groupby(by="Year").quantile(0.50)
     as19_std = df.groupby(by="Year").std()
     as19_low = df.drop(columns=["interval"]).groupby(by="Year").quantile(0.05)
     as19_high = df.drop(columns=["interval"]).groupby(by="Year").quantile(0.95)
 
-    as19_ctrl_mean = df_ctrl.groupby(by="Year").mean()
+    as19_ctrl_median = df_ctrl.groupby(by="Year").quantile(0.50)
 
     as19_ci = ax.fill_between(
-        as19_mean.index,
+        as19_median.index,
         as19_low["Cumulative ice sheet mass change (Gt)"],
         as19_high["Cumulative ice sheet mass change (Gt)"],
         color="0.5",
         alpha=0.50,
         linewidth=0.0,
         zorder=10,
-        label="Simulated (AS19) 90% c.i.",
+        label="AS19 90% c.i.",
     )
 
     ax.fill_between(
@@ -228,20 +228,20 @@ def plot_historical(out_filename, df, df_ctrl, grace):
         linewidth=0,
     )
 
-    l_es_mean = ax.plot(
-        as19_mean.index,
-        as19_mean["Cumulative ice sheet mass change (Gt)"],
+    l_es_median = ax.plot(
+        as19_median.index,
+        as19_median["Cumulative ice sheet mass change (Gt)"],
         color="k",
         linewidth=grace_signal_lw,
-        label="Mean(Ensemble)",
+        label="Median(Ensemble)",
     )
-    l_ctrl_mean = ax.plot(
-        as19_ctrl_mean.index,
-        as19_ctrl_mean["Cumulative ice sheet mass change (Gt)"],
+    l_ctrl_median = ax.plot(
+        as19_ctrl_median.index,
+        as19_ctrl_median["Cumulative ice sheet mass change (Gt)"],
         color="k",
         linewidth=grace_signal_lw,
         linestyle="dotted",
-        label="Mean(CTRL)",
+        label="Median(CTRL)",
     )
 
     grace_line = ax.plot(
@@ -258,7 +258,7 @@ def plot_historical(out_filename, df, df_ctrl, grace):
         [], [], color=simulated_signal_color, linewidth=simulated_signal_lw, label="Simulated (AS19)"
     )
 
-    legend = ax.legend(handles=[grace_line[0], l_ctrl_mean[0], l_es_mean[0], as19_ci], loc="lower left")
+    legend = ax.legend(handles=[grace_line[0], l_ctrl_median[0], l_es_median[0], as19_ci], loc="lower left")
     legend.get_frame().set_linewidth(0.0)
     legend.get_frame().set_alpha(0.0)
 
@@ -282,14 +282,14 @@ def plot_projection(out_filename, df, df_ctrl, grace):
     def plot_signal(g):
         m_df = g[-1]
         x = m_df["Year"]
-        y = m_df["Mass (Gt)"]
+        y = m_df["SLE (cm)"]
 
         return ax[0].plot(x, y, color=simulated_signal_color, linewidth=simulated_signal_lw)
 
     xmin = 2020
     xmax = 2100
-    ymin = -100000
-    ymax = 0
+    ymin = 0
+    ymax = 40
 
     fig, ax = plt.subplots(
         1,
@@ -304,44 +304,44 @@ def plot_projection(out_filename, df, df_ctrl, grace):
 
     # [plot_signal(g) for g in df.groupby(by=["Experiment"])]
 
-    as19_mean = df.groupby(by="Year").mean()
+    as19_median = df.drop(columns=["interval"]).groupby(by="Year").quantile(0.50)
     as19_std = df.groupby(by="Year").std()
     as19_low = df.drop(columns=["interval"]).groupby(by="Year").quantile(0.05)
     as19_high = df.drop(columns=["interval"]).groupby(by="Year").quantile(0.95)
 
-    as19_ctrl_mean = df_ctrl.groupby(by="Year").mean()
+    as19_ctrl_median = df_ctrl.groupby(by="Year").quantile(0.50)
 
     as19_ci = ax[0].fill_between(
-        as19_mean.index,
-        as19_low["Cumulative ice sheet mass change (Gt)"],
-        as19_high["Cumulative ice sheet mass change (Gt)"],
+        as19_median.index,
+        as19_low["SLE (cm)"],
+        as19_high["SLE (cm)"],
         color="0.5",
         alpha=0.50,
         linewidth=0.0,
         zorder=10,
-        label="Simulated (AS19) 90% c.i.",
+        label="AS19 90% c.i.",
     )
 
-    l_es_mean = ax[0].plot(
-        as19_mean.index,
-        as19_mean["Cumulative ice sheet mass change (Gt)"],
+    l_es_median = ax[0].plot(
+        as19_median.index,
+        as19_median["SLE (cm)"],
         color="k",
         linewidth=grace_signal_lw,
-        label="Mean(Ensemble)",
+        label="Median(Ensemble)",
     )
-    l_ctrl_mean = ax[0].plot(
-        as19_ctrl_mean.index,
-        as19_ctrl_mean["Cumulative ice sheet mass change (Gt)"],
+    l_ctrl_median = ax[0].plot(
+        as19_ctrl_median.index,
+        as19_ctrl_median["SLE (cm)"],
         color="k",
         linewidth=grace_signal_lw,
         linestyle="dotted",
-        label="Mean(CTRL)",
+        label="Median(CTRL)",
     )
 
     def plot_signal(g):
         m_df = g[-1]
         x = m_df["Year"]
-        y = m_df["Mass (Gt)"]
+        y = m_df["SLE (cm)"]
 
         return ax[0].plot(x, y, color=simulated_signal_color, linewidth=simulated_signal_lw)
 
@@ -349,9 +349,13 @@ def plot_projection(out_filename, df, df_ctrl, grace):
     l_bs = []
     for beta in [3, 2, 1]:
         m_df = df[df[f"Mass Trend {beta}-sigma (Gt/yr)"] == True]
-        as19_mean = m_df.groupby(by="Year").mean()
+        median = m_df.groupby(by="Year").median()
         l = ax[0].plot(
-            as19_mean.index, as19_mean["Mass (Gt)"], color=cmap[beta], linewidth=grace_signal_lw, label=f"{beta}-sigma"
+            median.index,
+            median["SLE (cm)"],
+            color=cmap[beta],
+            linewidth=grace_signal_lw,
+            label=f"{beta}-sigma",
         )
         l_bs.append(l[0])
 
@@ -359,11 +363,11 @@ def plot_projection(out_filename, df, df_ctrl, grace):
         [], [], color=simulated_signal_color, linewidth=simulated_signal_lw, label="Simulated (AS19)"
     )
 
-    legend = ax[0].legend(handles=[l_ctrl_mean[0], l_es_mean[0], as19_ci], loc="lower left")
+    legend = ax[0].legend(handles=[l_ctrl_median[0], l_es_median[0], as19_ci], loc="upper left")
     legend.get_frame().set_linewidth(0.0)
     legend.get_frame().set_alpha(0.0)
 
-    legend_2 = ax[0].legend(handles=l_bs, title="Calibrated", loc="lower right")
+    legend_2 = ax[0].legend(handles=l_bs, title="Calibrated", loc="upper center")
     legend_2.get_frame().set_linewidth(0.0)
     legend_2.get_frame().set_alpha(0.0)
 
@@ -378,14 +382,15 @@ def plot_projection(out_filename, df, df_ctrl, grace):
     df_2100 = df[df["Year"] == 2100]
     sns.kdeplot(
         data=df_2100,
-        y="Mass (Gt)",
+        #        y="SLE (cm)",
+        y="SLE (cm)",
         ax=ax[1],
         color="k",
     )
     for beta in [3, 2, 1]:
         sns.kdeplot(
             data=df_2100[df_2100[f"Mass Trend {beta}-sigma (Gt/yr)"] == True],
-            y="Mass (Gt)",
+            y="SLE (cm)",
             ax=ax[1],
             color=cmap[beta],
         )
@@ -650,6 +655,7 @@ for d, data in domain.items():
     print(f"Analyzing {d}")
 
     as19 = pd.read_csv("as19//aschwanden_et_al_2019_les_2008_norm.csv.gz")
+    as19 = as19[as19["Year"] <= 2100]
     as19["Cumulative ice sheet mass change (Gt)"] = as19["Mass (Gt)"]
     as19["SLE (cm)"] = -as19["Mass (Gt)"] / 362.5 / 10
 
