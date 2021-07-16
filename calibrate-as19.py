@@ -199,17 +199,18 @@ def plot_historical(out_filename, df, df_ctrl, grace):
 
     # [plot_signal(g) for g in df.groupby(by=["Experiment"])]
 
-    as19_median = df.drop(columns=["interval"]).groupby(by="Year").quantile(0.50)
-    as19_std = df.groupby(by="Year").std()
-    as19_low = df.drop(columns=["interval"]).groupby(by="Year").quantile(0.05)
-    as19_high = df.drop(columns=["interval"]).groupby(by="Year").quantile(0.95)
+    g = df.groupby(by="Year")["Cumulative ice sheet mass change (Gt)"]
+    as19_median = g.quantile(0.50)
+    As19_std = g.std()
+    as19_low = g.quantile(0.05)
+    as19_high = g.quantile(0.95)
 
-    as19_ctrl_median = df_ctrl.groupby(by="Year").quantile(0.50)
+    as19_ctrl_median = df_ctrl.groupby(by="Year")["Cumulative ice sheet mass change (Gt)"].quantile(0.50)
 
     as19_ci = ax.fill_between(
         as19_median.index,
-        as19_low["Cumulative ice sheet mass change (Gt)"],
-        as19_high["Cumulative ice sheet mass change (Gt)"],
+        as19_low,
+        as19_high,
         color="0.5",
         alpha=0.50,
         linewidth=0.0,
@@ -230,14 +231,14 @@ def plot_historical(out_filename, df, df_ctrl, grace):
 
     l_es_median = ax.plot(
         as19_median.index,
-        as19_median["Cumulative ice sheet mass change (Gt)"],
+        as19_median,
         color="k",
         linewidth=grace_signal_lw,
         label="Median(Ensemble)",
     )
     l_ctrl_median = ax.plot(
         as19_ctrl_median.index,
-        as19_ctrl_median["Cumulative ice sheet mass change (Gt)"],
+        as19_ctrl_median,
         color="k",
         linewidth=grace_signal_lw,
         linestyle="dotted",
@@ -659,6 +660,11 @@ for d, data in domain.items():
     as19["Cumulative ice sheet mass change (Gt)"] = as19["Mass (Gt)"]
     as19["SLE (cm)"] = -as19["Mass (Gt)"] / 362.5 / 10
 
+    as19_mc = pd.read_csv("as19//aschwanden_et_al_2019_mc_2008_norm.csv.gz")
+    as19_mc = as19_mc[as19_mc["Year"] <= 2100]
+    as19_mc["Cumulative ice sheet mass change (Gt)"] = as19_mc["Mass (Gt)"]
+    as19_mc["SLE (cm)"] = -as19_mc["Mass (Gt)"] / 362.5 / 10
+
     grace = pd.read_csv(
         "grace/greenland_mass_200204_202102.txt",
         header=30,
@@ -703,5 +709,16 @@ for d, data in domain.items():
     as19_ctrl = as19_ctrl[(as19_ctrl["Experiment"] == "CTRL") & (as19_ctrl["Resolution (m)"] == 900)]
     # h_df = df[(df["Year"] >= hist_start) & (df["Year"] <= proj_start)]
     # plot_historical_fluxes(f"{d}_fluxes_historical.pdf", df, mou19)
-    plot_historical(f"{d}_PISM_calibration_historical.pdf", as19, as19_ctrl, grace)
-    plot_projection(f"{d}_PISM_calibration_projection.pdf", as19, as19_ctrl, grace)
+    # plot_historical(f"{d}_PISM_calibration_historical.pdf", as19, as19_ctrl, grace)
+    # plot_projection(f"{d}_PISM_calibration_projection.pdf", as19, as19_ctrl, grace)
+
+    as19_2100 = as19[as19["Year"] == 2100]
+    as19_mc_2100 = as19_mc[as19_mc["Year"] == 2100]
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    sns.kdeplot(data=as19_mc_2100, x="SLE (cm)", hue="RCP", palette=["#003466"], ax=ax)
+    sns.kdeplot(
+        data=as19_2100, x="SLE (cm)", hue="RCP", palette=["#003466", "#5492CD", "#990002"], ax=ax, linestyle="dotted"
+    )
+    set_size(5, 2.5)
+    fig.savefig("sle_pdf.pdf", bbox_inches="tight")
