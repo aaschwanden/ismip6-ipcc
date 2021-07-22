@@ -209,12 +209,16 @@ def load_ismip6_ant():
     return df
 
 
-def load_ismip6_gris():
+def load_ismip6_gris(remove_ctrl=True):
     outpath = "."
     v_dir = "v7_CMIP5_pub"
     url = f"https://zenodo.org/record/3939037/files/{v_dir}.zip"
 
-    ismip6_filename = "ismip6_gris_ctrl_removed.csv.gz"
+    if remove_ctrl:
+        ismip6_filename = "ismip6_gris_ctrl_removed.csv.gz"
+    else:
+        ismip6_filename = "ismip6_gris_ctrl.csv.gz"
+
     if os.path.isfile(ismip6_filename):
         df = pd.read_csv(ismip6_filename)
     else:
@@ -224,12 +228,12 @@ def load_ismip6_gris():
                 with ZipFile(BytesIO(zipresp.read())) as zfile:
                     zfile.extractall(outpath)
         print("   ...and converting to CSV")
-        ismip6_to_csv(v_dir, ismip6_filename)
+        ismip6_to_csv(v_dir, ismip6_filename, remove_ctrl)
         df = pd.read_csv(ismip6_filename)
     return df
 
 
-def ismip6_to_csv(basedir, ismip6_filename):
+def ismip6_to_csv(basedir, ismip6_filename, remove_ctrl):
     # Now read model output from each of the ISMIP6 files. The information we
     # need is in the file names, not the metadate so this is no fun.
     # Approach is to read each dataset into a dataframe, then concatenate all
@@ -295,9 +299,14 @@ def ismip6_to_csv(basedir, ismip6_filename):
         So ctrl after the historical spinup represents an abrupt return to an earlier SMB forcing in 2015.
         """
 
-        proj_sle = exp_sle
-        proj_mass = exp_mass
-        proj_smb = exp_smb
+        if remove_ctrl:
+            proj_sle = exp_sle
+            proj_mass = exp_mass
+            proj_smb = exp_smb
+        else:
+            proj_sle = exp_sle + ctrl_sle
+            proj_mass = exp_mass + ctrl_mass
+            proj_smb = exp_smb + ctrl_smb
 
         # Historical simulations start at different years since initialization was left
         # up to the modelers

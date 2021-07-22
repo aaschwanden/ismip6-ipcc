@@ -19,7 +19,7 @@ import matplotlib.colors as colors
 
 
 def set_size(w, h, ax=None):
-    """ w, h: width, height in inches """
+    """w, h: width, height in inches"""
 
     if not ax:
         ax = plt.gca()
@@ -201,7 +201,7 @@ def plot_historical(out_filename, df, df_ctrl, grace):
 
     g = df.groupby(by="Year")["Cumulative ice sheet mass change (Gt)"]
     as19_median = g.quantile(0.50)
-    As19_std = g.std()
+    as19_std = g.std()
     as19_low = g.quantile(0.05)
     as19_high = g.quantile(0.95)
 

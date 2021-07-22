@@ -22,7 +22,7 @@ import time
 
 
 def set_size(w, h, ax=None):
-    """ w, h: width, height in inches """
+    """w, h: width, height in inches"""
 
     if not ax:
         ax = plt.gca()
@@ -158,7 +158,7 @@ def plot_historical_partitioning_cumulative(out_filename, df, mou19):
     fig.savefig(out_filename, bbox_inches="tight")
 
 
-def plot_historical_partitioning(out_filename, df, mou19, man):
+def plot_historical_partitioning(out_filename, df, imbie):
     def plot_smb(g):
         return ax.plot(
             g[-1]["Year"],
@@ -200,55 +200,6 @@ def plot_historical_partitioning(out_filename, df, mou19, man):
         color=imbie_sigma_color,
         alpha=0.5,
         linewidth=0,
-    )
-
-    ax.fill_between(
-        mou19["Year"],
-        0.95 * mou19["Rate of surface mass balance anomaly (Gt/yr)"],
-        1.05 * mou19["Rate of surface mass balance anomaly (Gt/yr)"],
-        color=mouginot_sigma_color,
-        alpha=0.5,
-        linewidth=0,
-    )
-    ax.fill_between(
-        mou19["Year"],
-        0.96 * mou19["Rate of ice dynamics anomaly (Gt/yr)"],
-        1.04 * mou19["Rate of ice dynamics anomaly (Gt/yr)"],
-        color=mouginot_sigma_color,
-        alpha=0.5,
-        linewidth=0,
-    )
-
-    ax.plot(
-        mou19["Year"],
-        mou19["Rate of surface mass balance anomaly (Gt/yr)"],
-        color=mouginot_signal_color,
-        linewidth=mouginot_signal_lw,
-        linestyle="solid",
-    )
-    ax.plot(
-        mou19["Year"],
-        mou19["Rate of ice dynamics anomaly (Gt/yr)"],
-        color=mouginot_signal_color,
-        linewidth=mouginot_signal_lw,
-        linestyle="dashed",
-    )
-
-    ax.fill_between(
-        man["Year"],
-        -man["Discharge [Gt yr-1]"] - 1 * man["Discharge Error [Gt yr-1]"],
-        -man["Discharge [Gt yr-1]"] + 1 * man["Discharge Error [Gt yr-1]"],
-        color=mankoff_sigma_color,
-        alpha=0.5,
-        linewidth=0,
-    )
-
-    ax.plot(
-        man["Year"],
-        -man["Discharge [Gt yr-1]"],
-        color=mankoff_signal_color,
-        linewidth=mouginot_signal_lw,
-        linestyle="dashed",
     )
 
     ax.plot(
@@ -300,7 +251,7 @@ def plot_historical_partitioning(out_filename, df, mou19, man):
     legend_1.get_frame().set_alpha(0.0)
 
     legend_2 = ax.legend(
-        handles=[l_simulated, l_mou19, l_imbie, l_man],
+        handles=[l_simulated, l_imbie],
         loc="upper left",
         bbox_to_anchor=(0.30, 0.01, 0, 0),
         bbox_transform=plt.gcf().transFigure,
