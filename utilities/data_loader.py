@@ -281,12 +281,6 @@ def ismip6_to_csv(basedir, ismip6_filename, remove_ctrl):
         ctrl_mass = nc_ctrl.variables["limgr"][:] / 1e12
         ctrl_smb = nc_ctrl.variables["smb"][:] / 1e12 * secpera
 
-        # Historical
-        nc_hist = NC(hist_file)
-        hist_sle = nc_hist.variables["sle"][:-1] - nc_hist.variables["sle"][-1]
-        hist_mass = (nc_hist.variables["limgr"][:-1] - nc_hist.variables["limgr"][-1]) / 1e12
-        hist_smb = nc_hist.variables["smb"][:-1] / 1e12 * secpera
-
         # Per email with Heiko on Nov. 13, 2020, stick with just the exp projections alone, without adding back the ctrl projections
         """
         from Heiko:
@@ -299,11 +293,19 @@ def ismip6_to_csv(basedir, ismip6_filename, remove_ctrl):
         So ctrl after the historical spinup represents an abrupt return to an earlier SMB forcing in 2015.
         """
 
+        # Historical
+        nc_hist = NC(hist_file)
         if remove_ctrl:
+            hist_sle = nc_hist.variables["sle"][:-1] - nc_hist.variables["sle"][-1]
+            hist_mass = (nc_hist.variables["limgr"][:-1] - nc_hist.variables["limgr"][-1]) / 1e12
+            hist_smb = nc_hist.variables["smb"][:-1] / 1e12 * secpera
             proj_sle = exp_sle
             proj_mass = exp_mass
             proj_smb = exp_smb
         else:
+            hist_sle = nc_hist.variables["sle"][:-1]
+            hist_mass = nc_hist.variables["limgr"][:-1] / 1e12
+            hist_smb = nc_hist.variables["smb"][:-1] / 1e12 * secpera
             proj_sle = exp_sle + ctrl_sle
             proj_mass = exp_mass + ctrl_mass
             proj_smb = exp_smb + ctrl_smb
