@@ -67,7 +67,39 @@ def get_credentials():
     return (username, password)
 
 
-def load_imbie():
+def load_imbie_ant():
+    """
+    Loading the IMBIE Greenland data set downloaded from
+    http://imbie.org/data-files/imbie_dataset-2018_07_23.xlsx
+    """
+    imbie_df = pd.read_excel(
+        "http://imbie.org/data-files/imbie_dataset-2018_07_23.xlsx",
+        sheet_name="Antarctica",
+        engine="openpyxl",
+    )
+    imbie = imbie_df[
+        [
+            "Year",
+            "Cumulative ice mass change (Gt)",
+            "Cumulative ice mass change uncertainty (Gt)",
+        ]
+    ].rename(
+        columns={
+            "Cumulative ice mass change (Gt)": "Cumulative ice sheet mass change (Gt)",
+            "Cumulative ice mass change uncertainty (Gt)": "Cumulative ice sheet mass change uncertainty (Gt)",
+        }
+    )
+
+    for v in [
+        "Cumulative ice sheet mass change (Gt)",
+        "Cumulative ice sheet mass change uncertainty (Gt)",
+    ]:
+        imbie[v] -= imbie[imbie["Year"] == proj_start][v].values
+
+    return imbie
+
+
+def load_imbie_gris():
     """
     Loading the IMBIE Greenland data set downloaded from
     http://imbie.org/wp-content/uploads/2012/11/imbie_dataset_greenland_dynamics-2020_02_28.xlsx
@@ -194,7 +226,10 @@ def load_ismip6_ant():
     v_dir = "ComputedScalarsPaper"
     url = "https://zenodo.org/record/3940766/files/ComputedScalarsPaper.zip"
 
-    ismip6_filename = "ismip6_ant_ctrl_removed.csv.gz"
+    if remove_ctrl:
+        ismip6_filename = "ismip6_ant_ctrl_removed.csv.gz"
+    else:
+        ismip6_filename = "ismip6_ant_ctrl.csv.gz"
     if os.path.isfile(ismip6_filename):
         df = pd.read_csv(ismip6_filename)
     else:
@@ -228,12 +263,12 @@ def load_ismip6_gris(remove_ctrl=True):
                 with ZipFile(BytesIO(zipresp.read())) as zfile:
                     zfile.extractall(outpath)
         print("   ...and converting to CSV")
-        ismip6_to_csv(v_dir, ismip6_filename, remove_ctrl)
+        ismip6_gris_to_csv(v_dir, ismip6_filename, remove_ctrl)
         df = pd.read_csv(ismip6_filename)
     return df
 
 
-def ismip6_to_csv(basedir, ismip6_filename, remove_ctrl):
+def ismip6_gris_to_csv(basedir, ismip6_filename, remove_ctrl):
     # Now read model output from each of the ISMIP6 files. The information we
     # need is in the file names, not the metadate so this is no fun.
     # Approach is to read each dataset into a dataframe, then concatenate all
@@ -382,3 +417,54 @@ def ismip6_to_csv(basedir, ismip6_filename, remove_ctrl):
         }
     )
     df.to_csv(ismip6_filename, compression="gzip")
+
+
+def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
+    # Now read model output from each of the ISMIP6 files. The information we
+    # need is in the file names, not the metadate so this is no fun.
+    # Approach is to read each dataset into a dataframe, then concatenate all
+    #   dataframes into one Arch dataframe that contains all model runs.
+    # Resulting dataframe consists of both historical and projected changes
+
+    ctrl_open_files = []
+    for path in Path(basedir).rglob("computed_*_ctrl_proj_open.nc"):
+        ctrl_open_files.append(path)
+    ctrl_std_files = []
+    for path in Path(basedir).rglob("computed_*_ctrl_proj_std.nc"):
+        ctrl_open_files.append(path)
+
+    hist_open_files = []
+    for path in Path(basedir).rglob("computed_*_hist_open.nc"):
+        hist_open_files.append(path)
+    hist_std_files = []
+    for path in Path(basedir).rglob("computed_*_hist_std.nc"):
+        hist_std_files.append(path)
+
+    dfs = []
+    m_var = "ivol"
+    for path in Path(basedir).rglob(f"computed_{m_var}_*.nc"):
+        # Experiment
+        nc = NC(path)
+        exp = nc.variables[m_var][:]
+        exp -= exp[0]
+        # m3 to kg
+        exp *= 910
+        exp /= 1e12
+        f = path.name.split(f"computed_")[-1].split(".nc")[0].split("_")[1:4]
+        print(f)
+        # This is ugly, because of "ITLS_PIK"
+        if len(f) == 3:
+            group, model, exp = f
+        else:
+            g1, g2, model, exp = f
+            group = f"{g1}_{g2}"
+
+        if exp in ["exp07"]:
+            rcp = 26
+        else:
+            rcp = 85
+        # Find the coressponding CTRL Historical simulations
+        ctrl_open_file = [m for m in ctrl_open_files if (f"{group}_{model}" in m.name)][0]
+        ctrl_std_file = [m for m in ctrl_std_files if (f"{group}_{model}" in m.name)][0]
+        hist_open_file = [m for m in hist_open_files if (f"{group}_{model}" in m.name)][0]
+        hist_std_file = [m for m in hist_std_files if (f"{group}_{model}" in m.name)][0]
