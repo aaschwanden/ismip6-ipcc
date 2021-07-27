@@ -426,45 +426,123 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
     #   dataframes into one Arch dataframe that contains all model runs.
     # Resulting dataframe consists of both historical and projected changes
 
-    ctrl_open_files = []
-    for path in Path(basedir).rglob("computed_*_ctrl_proj_open.nc"):
-        ctrl_open_files.append(path)
-    ctrl_std_files = []
-    for path in Path(basedir).rglob("computed_*_ctrl_proj_std.nc"):
-        ctrl_open_files.append(path)
+    exp_dict = {
+        "exp01": "open",
+        "exp02": "open",
+        "exp03": "open",
+        "exp04": "open",
+        "exp05": "std",
+        "exp06": "std",
+        "exp07": "std",
+        "exp08": "std",
+        "exp09": "std",
+        "exp10": "std",
+        "exp11": "open",
+        "exp12": "std",
+        "exp13": "std",
+        "expA1": "open",
+        "expA2": "open",
+        "expA3": "open",
+        "expA4": "open",
+        "expA5": "std",
+        "expA6": "std",
+        "expA7": "std",
+        "expA8": "std",
+    }
+    a_dfs = []
+    for m_var, m_desc in zip(
+        ["ivol", "smb"], ["Cumulative ice sheet mass change (Gt)", "Rate of surface mass balance anomaly (Gt/yr)"]
+    ):
+        dfs = []
 
-    hist_open_files = []
-    for path in Path(basedir).rglob("computed_*_hist_open.nc"):
-        hist_open_files.append(path)
-    hist_std_files = []
-    for path in Path(basedir).rglob("computed_*_hist_std.nc"):
-        hist_std_files.append(path)
-
-    dfs = []
-    m_var = "ivol"
-    for path in Path(basedir).rglob(f"computed_{m_var}_*.nc"):
-        # Experiment
-        nc = NC(path)
-        exp = nc.variables[m_var][:]
-        exp -= exp[0]
-        # m3 to kg
-        exp *= 910
-        exp /= 1e12
-        f = path.name.split(f"computed_")[-1].split(".nc")[0].split("_")[1:4]
-        print(f)
-        # This is ugly, because of "ITLS_PIK"
-        if len(f) == 3:
-            group, model, exp = f
+        if remove_ctrl:
+            m_pattern = f"computed_{m_var}_minus_ctrl_*.nc"
         else:
-            g1, g2, model, exp = f
-            group = f"{g1}_{g2}"
+            m_pattern = f"computed_{m_var}_*.nc"
 
-        if exp in ["exp07"]:
-            rcp = 26
-        else:
-            rcp = 85
-        # Find the coressponding CTRL Historical simulations
-        ctrl_open_file = [m for m in ctrl_open_files if (f"{group}_{model}" in m.name)][0]
-        ctrl_std_file = [m for m in ctrl_std_files if (f"{group}_{model}" in m.name)][0]
-        hist_open_file = [m for m in hist_open_files if (f"{group}_{model}" in m.name)][0]
-        hist_std_file = [m for m in hist_std_files if (f"{group}_{model}" in m.name)][0]
+        for group in os.listdir(basedir):
+            if not group.startswith("."):
+                for model in os.listdir(os.path.join(basedir, group)):
+                    if not model.startswith("."):
+                        for p in Path(os.path.join(basedir, group, model)).rglob(m_pattern):
+                            print(p)
+                            # Experiment
+                            nc = NC(p)
+                            m_exp_time = nc.variables["time"][:]
+                            m_exp = nc.variables[m_var][:]
+                            m_exp -= m_exp[0]
+                            exp = p.name.split(f"computed_")[-1].split(".nc")[0].split("_")[-1]
+
+                            if exp in ["exp03", "exp07", "expA4", "expA8"]:
+                                rcp = 26
+                            else:
+                                rcp = 85
+
+                            hist_f = os.path.join(
+                                basedir,
+                                group,
+                                model,
+                                f"hist_{exp_dict[exp]}",
+                                f"computed_{m_var}_AIS_{group}_{model}_hist_{exp_dict[exp]}.nc",
+                            )
+                            if os.path.isfile(hist_f):
+                                nc_hist = NC(hist_f)
+                                m_hist = nc_hist.variables[m_var][:]
+                                m_hist -= m_hist[-1]
+
+                                # Historical simulations start at different years since initialization was left
+                                # up to the modelers
+                                hist_time = -np.arange(len(m_hist))[::-1] + proj_start
+                            else:
+                                hist_time = []
+                                m_hist = []
+
+                            # ctrl_proj_f = os.path.join(
+                            #     basedir,
+                            #     group,
+                            #     model,
+                            #     f"ctrl_proj_{exp_dict[exp]}",
+                            #     f"computed_{m_var}_AIS_{group}_{model}_ctrl_proj_{exp_dict[exp]}.nc",
+                            # )
+                            # nc_ctrl_proj = NC(ctrl_proj_f)
+                            # m_ctrl_proj = nc_ctrl_proj.variables[m_var][:]
+                            # m_ctrl_proj -= m_ctrl_proj[0]
+
+                            m_time = np.hstack((hist_time, m_exp_time))
+                            m_mass = np.hstack((m_hist, m_exp))
+
+                            n = len(m_time)
+                            dfs.append(
+                                pd.DataFrame(
+                                    data=np.hstack(
+                                        [
+                                            m_time.reshape(-1, 1),
+                                            m_mass.reshape(-1, 1),
+                                            np.repeat(group, n).reshape(-1, 1),
+                                            np.repeat(model, n).reshape(-1, 1),
+                                            np.repeat(exp, n).reshape(-1, 1),
+                                            np.repeat(rcp, n).reshape(-1, 1),
+                                        ]
+                                    ),
+                                    columns=[
+                                        "Year",
+                                        m_desc,
+                                        "Group",
+                                        "Model",
+                                        "Exp",
+                                        "RCP",
+                                    ],
+                                )
+                            )
+        a_dfs.append(pd.concat(dfs))
+        df = pd.concat(a_dfs)
+        df.astype(
+            {"Cumulative ice sheet mass change (Gt)": float, "Rate of surface mass balance anomaly (Gt/yr)": float}
+        )
+
+        df["Cumulative ice sheet mass change (Gt)"] *= 910
+        df["Cumulative ice sheet mass change (Gt)"] /= 1e12
+
+        df["Rate of surface mass balance anomaly (Gt/yr)"] *= 910
+        df["Rate of surface mass balance anomaly (Gt/yr)"] /= 1e12
+        return df
