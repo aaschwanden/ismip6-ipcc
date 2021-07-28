@@ -221,7 +221,7 @@ def load_grace():
     return grace
 
 
-def load_ismip6_ant():
+def load_ismip6_ant(remove_ctrl=True):
     outpath = "."
     v_dir = "ComputedScalarsPaper"
     url = "https://zenodo.org/record/3940766/files/ComputedScalarsPaper.zip"
@@ -239,7 +239,7 @@ def load_ismip6_ant():
                 with ZipFile(BytesIO(zipresp.read())) as zfile:
                     zfile.extractall(outpath)
         print("   ...and converting to CSV")
-        ismip6_to_csv(v_dir, ismip6_filename)
+        ismip6_ant_to_csv(v_dir, ismip6_filename, remove_ctrl=True)
         df = pd.read_csv(ismip6_filename)
     return df
 
@@ -536,7 +536,7 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
                             )
         a_dfs.append(pd.concat(dfs))
         df = pd.concat(a_dfs)
-        df.astype(
+        df = df.astype(
             {"Cumulative ice sheet mass change (Gt)": float, "Rate of surface mass balance anomaly (Gt/yr)": float}
         )
 
