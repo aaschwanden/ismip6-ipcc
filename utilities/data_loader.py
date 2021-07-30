@@ -96,6 +96,9 @@ def load_imbie_ant():
     ]:
         imbie[v] -= imbie[imbie["Year"] == proj_start][v].values
 
+    imbie["Rate of ice sheet mass change (Gt/yr)"] = np.gradient(
+        imbie["Cumulative ice sheet mass change (Gt)"]
+    ) / np.gradient(imbie["Year"])
     return imbie
 
 
@@ -239,7 +242,7 @@ def load_ismip6_ant(remove_ctrl=True):
                 with ZipFile(BytesIO(zipresp.read())) as zfile:
                     zfile.extractall(outpath)
         print("   ...and converting to CSV")
-        ismip6_ant_to_csv(v_dir, ismip6_filename, remove_ctrl=True)
+        ismip6_ant_to_csv(v_dir, ismip6_filename, remove_ctrl)
         df = pd.read_csv(ismip6_filename)
     return df
 
@@ -455,94 +458,206 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
     ):
         dfs = []
 
-        if remove_ctrl:
-            m_pattern = f"computed_{m_var}_minus_ctrl_*.nc"
-        else:
-            m_pattern = f"computed_{m_var}_*.nc"
+        m_pattern = f"computed_{m_var}_AIS_*.nc"
 
         for group in os.listdir(basedir):
             if not group.startswith("."):
                 for model in os.listdir(os.path.join(basedir, group)):
                     if not model.startswith("."):
                         for p in Path(os.path.join(basedir, group, model)).rglob(m_pattern):
-                            print(p)
-                            # Experiment
-                            nc = NC(p)
-                            m_exp_time = nc.variables["time"][:]
-                            m_exp = nc.variables[m_var][:]
-                            m_exp -= m_exp[0]
-                            exp = p.name.split(f"computed_")[-1].split(".nc")[0].split("_")[-1]
+                            if not ("ctrl" in str(p)) | ("hist" in str(p)):
+                                # Experiment
+                                nc = NC(p)
+                                m_exp = nc.variables[m_var][:]
+                                exp_time = nc.variables["time"][:]
+                                exp = p.name.split(f"computed_")[-1].split(".nc")[0].split("_")[-1]
+                                m_e = pd.Series(data=m_exp - m_exp[0], index=exp_time)
 
-                            if exp in ["exp03", "exp07", "expA4", "expA8"]:
-                                rcp = 26
-                            else:
-                                rcp = 85
+                                if exp in ["exp03", "exp07", "expA4", "expA8"]:
+                                    rcp = 26
+                                else:
+                                    rcp = 85
 
-                            hist_f = os.path.join(
-                                basedir,
-                                group,
-                                model,
-                                f"hist_{exp_dict[exp]}",
-                                f"computed_{m_var}_AIS_{group}_{model}_hist_{exp_dict[exp]}.nc",
-                            )
-                            if os.path.isfile(hist_f):
-                                nc_hist = NC(hist_f)
-                                m_hist = nc_hist.variables[m_var][:]
-                                m_hist -= m_hist[-1]
-
-                                # Historical simulations start at different years since initialization was left
-                                # up to the modelers
-                                hist_time = -np.arange(len(m_hist))[::-1] + proj_start
-                            else:
-                                hist_time = []
-                                m_hist = []
-
-                            # ctrl_proj_f = os.path.join(
-                            #     basedir,
-                            #     group,
-                            #     model,
-                            #     f"ctrl_proj_{exp_dict[exp]}",
-                            #     f"computed_{m_var}_AIS_{group}_{model}_ctrl_proj_{exp_dict[exp]}.nc",
-                            # )
-                            # nc_ctrl_proj = NC(ctrl_proj_f)
-                            # m_ctrl_proj = nc_ctrl_proj.variables[m_var][:]
-                            # m_ctrl_proj -= m_ctrl_proj[0]
-
-                            m_time = np.hstack((hist_time, m_exp_time))
-                            m_mass = np.hstack((m_hist, m_exp))
-
-                            n = len(m_time)
-                            dfs.append(
-                                pd.DataFrame(
-                                    data=np.hstack(
-                                        [
-                                            m_time.reshape(-1, 1),
-                                            m_mass.reshape(-1, 1),
-                                            np.repeat(group, n).reshape(-1, 1),
-                                            np.repeat(model, n).reshape(-1, 1),
-                                            np.repeat(exp, n).reshape(-1, 1),
-                                            np.repeat(rcp, n).reshape(-1, 1),
-                                        ]
-                                    ),
-                                    columns=[
-                                        "Year",
-                                        m_desc,
-                                        "Group",
-                                        "Model",
-                                        "Exp",
-                                        "RCP",
-                                    ],
+                                hist_f = os.path.join(
+                                    basedir,
+                                    group,
+                                    model,
+                                    f"hist_{exp_dict[exp]}",
+                                    f"computed_{m_var}_AIS_{group}_{model}_hist_{exp_dict[exp]}.nc",
                                 )
-                            )
+                                if os.path.isfile(hist_f):
+                                    nc_hist = NC(hist_f)
+                                    m_hist = nc_hist.variables[m_var][:]
+                                    m_hist -= m_hist[-1]
+
+                                    # Historical simulations start at different years since initialization was left
+                                    # up to the modelers
+                                    hist_time = nc_hist.variables["time"][:]
+                                else:
+                                    hist_time = []
+                                    m_hist = []
+
+                                ctrl_f = os.path.join(
+                                    basedir,
+                                    group,
+                                    model,
+                                    f"ctrl_proj_{exp_dict[exp]}",
+                                    f"computed_{m_var}_AIS_{group}_{model}_ctrl_proj_{exp_dict[exp]}.nc",
+                                )
+                                if remove_ctrl and os.path.isfile(ctrl_f):
+                                    nc_ctrl = NC(ctrl_f)
+                                    ctrl_time = nc_ctrl.variables["time"][:]
+                                    m_ctrl = nc_ctrl.variables[m_var][:]
+                                    m_c = pd.Series(data=m_ctrl - m_ctrl[0], index=ctrl_time)
+                                    m_e -= m_c
+
+                                m_time = np.ceil(np.hstack((hist_time, m_e.index - 1)))
+                                m_mass = np.hstack((m_hist, m_e.values))
+
+                                n = len(m_time)
+                                dfs.append(
+                                    pd.DataFrame(
+                                        data=np.hstack(
+                                            [
+                                                m_time.reshape(-1, 1),
+                                                m_mass.reshape(-1, 1),
+                                                np.repeat(group, n).reshape(-1, 1),
+                                                np.repeat(model, n).reshape(-1, 1),
+                                                np.repeat(exp, n).reshape(-1, 1),
+                                                np.repeat(rcp, n).reshape(-1, 1),
+                                            ]
+                                        ),
+                                        columns=[
+                                            "Year",
+                                            m_desc,
+                                            "Group",
+                                            "Model",
+                                            "Exp",
+                                            "RCP",
+                                        ],
+                                    )
+                                )
         a_dfs.append(pd.concat(dfs))
-        df = pd.concat(a_dfs)
-        df = df.astype(
-            {"Cumulative ice sheet mass change (Gt)": float, "Rate of surface mass balance anomaly (Gt/yr)": float}
+    df = pd.merge(a_dfs[0], a_dfs[-1], on=["Year", "Group", "Model", "Exp", "RCP"])
+    df = df.astype(
+        {
+            "Year": float,
+            "Cumulative ice sheet mass change (Gt)": float,
+            "Rate of surface mass balance anomaly (Gt/yr)": float,
+        }
+    ).drop_duplicates()
+    df["Cumulative ice sheet mass change (Gt)"] *= 910
+    df["Cumulative ice sheet mass change (Gt)"] /= 1e12
+
+    df["Rate of surface mass balance anomaly (Gt/yr)"] /= 1e12
+    df["Rate of surface mass balance anomaly (Gt/yr)"] *= secpera
+
+    df["Rate of ice sheet mass change (Gt/yr)"] = np.gradient(
+        df["Cumulative ice sheet mass change (Gt)"].values
+    ) / np.gradient(df["Year"].values)
+    df["Rate of ice dynamics anomaly (Gt/yr)"] = (
+        df["Rate of ice sheet mass change (Gt/yr)"] - df["Rate of surface mass balance anomaly (Gt/yr)"]
+    )
+    df.to_csv(ismip6_filename, compression="gzip")
+
+
+def plot_historical_partitioning(out_filename, df, imbie):
+    def plot_smb(g):
+        return ax.plot(
+            g[-1]["Year"],
+            g[-1]["Rate of surface mass balance anomaly (Gt/yr)"],
+            color=simulated_signal_color,
+            linewidth=simulated_signal_lw,
+            linestyle="solid",
         )
 
-        df["Cumulative ice sheet mass change (Gt)"] *= 910
-        df["Cumulative ice sheet mass change (Gt)"] /= 1e12
+    def plot_d(g):
+        return ax.plot(
+            g[-1]["Year"],
+            g[-1]["Rate of ice dynamics anomaly (Gt/yr)"],
+            color=simulated_signal_color,
+            linewidth=simulated_signal_lw,
+            linestyle="dashed",
+        )
 
-        df["Rate of surface mass balance anomaly (Gt/yr)"] *= 910
-        df["Rate of surface mass balance anomaly (Gt/yr)"] /= 1e12
-        return df
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    [plot_smb(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
+    [plot_d(g) for g in df.groupby(by=["Group", "Model", "Exp"])]
+
+    ax.fill_between(
+        imbie["Year"],
+        imbie["Rate of surface mass balance anomaly (Gt/yr)"]
+        - 1 * imbie["Rate of surface mass balance anomaly uncertainty (Gt/yr)"],
+        imbie["Rate of surface mass balance anomaly (Gt/yr)"]
+        + 1 * imbie["Rate of surface mass balance anomaly uncertainty (Gt/yr)"],
+        color=imbie_sigma_color,
+        alpha=0.5,
+        linewidth=0,
+    )
+
+    ax.fill_between(
+        imbie["Year"],
+        imbie["Rate of ice dynamics anomaly (Gt/yr)"] - 1 * imbie["Rate of ice dynamics anomaly uncertainty (Gt/yr)"],
+        imbie["Rate of ice dynamics anomaly (Gt/yr)"] + 1 * imbie["Rate of ice dynamics anomaly uncertainty (Gt/yr)"],
+        color=imbie_sigma_color,
+        alpha=0.5,
+        linewidth=0,
+    )
+
+    ax.plot(
+        imbie["Year"],
+        imbie["Rate of surface mass balance anomaly (Gt/yr)"],
+        color=imbie_signal_color,
+        linewidth=imbie_signal_lw,
+        linestyle="solid",
+    )
+    ax.plot(
+        imbie["Year"],
+        imbie["Rate of ice dynamics anomaly (Gt/yr)"],
+        color=imbie_signal_color,
+        linewidth=imbie_signal_lw,
+        linestyle="dashed",
+    )
+
+    ax.axvline(proj_start, color="k", linestyle="dashed", linewidth=grace_signal_lw)
+    ax.axhline(0, color="k", linestyle="dotted", linewidth=grace_signal_lw)
+
+    l_smb = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="solid", label="SMB")
+    l_d = mlines.Line2D([], [], color="k", linewidth=0.5, linestyle="dashed", label="D")
+    l_imbie = mlines.Line2D(
+        [], [], color=imbie_signal_color, linewidth=0.5, linestyle="solid", label="Reconstructed (IMBIE)"
+    )
+    l_simulated = mlines.Line2D(
+        [], [], color=simulated_signal_color, linewidth=0.5, linestyle="solid", label="Simulated"
+    )
+    legend_1 = ax.legend(
+        handles=[l_smb, l_d], loc="upper left", bbox_to_anchor=(0.1, 0.01, 0, 0), bbox_transform=plt.gcf().transFigure
+    )
+    legend_1.get_frame().set_linewidth(0.0)
+    legend_1.get_frame().set_alpha(0.0)
+
+    legend_2 = ax.legend(
+        handles=[l_simulated, l_imbie],
+        loc="upper left",
+        bbox_to_anchor=(0.30, 0.01, 0, 0),
+        bbox_transform=plt.gcf().transFigure,
+    )
+    #    legend_2 = ax.legend(handles=[l_mou19, l_man, l_simulated], loc="upper right")
+    legend_2.get_frame().set_linewidth(0.0)
+    legend_2.get_frame().set_alpha(0.0)
+
+    # Pylab automacially removes first legend when legend is called a second time.
+    # Add legend 1 back
+    ax.add_artist(legend_1)
+
+    ax.set_xlabel("Year")
+    ax.set_ylabel(f"Flux (Gt/yr)")
+
+    ax.set_xlim(2000, 2014)
+    ymin = -750
+    ymax = 750
+    ax.set_ylim(ymin, ymax)
+
+    set_size(3.2, 2)
+    fig.savefig(out_filename, bbox_inches="tight")
