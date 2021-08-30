@@ -469,14 +469,35 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
                                 # Experiment
                                 nc = NC(p)
                                 m_exp = nc.variables[m_var][:]
+                                m_exp -= m_exp[0]
                                 exp_time = nc.variables["time"][:]
                                 exp = p.name.split(f"computed_")[-1].split(".nc")[0].split("_")[-1]
-                                m_e = pd.Series(data=m_exp - m_exp[0], index=exp_time)
-
                                 if exp in ["exp03", "exp07", "expA4", "expA8"]:
                                     rcp = 26
                                 else:
                                     rcp = 85
+
+                                n_exp = len(m_exp)
+                                exp_df = pd.DataFrame(
+                                    data=np.hstack(
+                                        (
+                                            exp_time.reshape(-1, 1),
+                                            m_exp.reshape(-1, 1),
+                                            np.repeat(group, n_exp).reshape(-1, 1),
+                                            np.repeat(model, n_exp).reshape(-1, 1),
+                                            np.repeat(exp, n_exp).reshape(-1, 1),
+                                            np.repeat(rcp, n_exp).reshape(-1, 1),
+                                        )
+                                    ),
+                                    columns=[
+                                        "Year",
+                                        m_desc,
+                                        "Group",
+                                        "Model",
+                                        "Exp",
+                                        "RCP",
+                                    ],
+                                ).astype({"Year": float, m_desc: float})
 
                                 hist_f = os.path.join(
                                     basedir,
@@ -494,8 +515,29 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
                                     # up to the modelers
                                     hist_time = nc_hist.variables["time"][:]
                                 else:
-                                    hist_time = []
-                                    m_hist = []
+                                    hist_time = np.array([])
+                                    m_hist = np.array([])
+                                n_hist = len(m_hist)
+                                hist_df = pd.DataFrame(
+                                    data=np.hstack(
+                                        (
+                                            hist_time.reshape(-1, 1),
+                                            m_hist.reshape(-1, 1),
+                                            np.repeat(group, n_hist).reshape(-1, 1),
+                                            np.repeat(model, n_hist).reshape(-1, 1),
+                                            np.repeat(exp, n_hist).reshape(-1, 1),
+                                            np.repeat(rcp, n_hist).reshape(-1, 1),
+                                        )
+                                    ),
+                                    columns=[
+                                        "Year",
+                                        m_desc,
+                                        "Group",
+                                        "Model",
+                                        "Exp",
+                                        "RCP",
+                                    ],
+                                ).astype({"Year": float, m_desc: float})
 
                                 ctrl_f = os.path.join(
                                     basedir,
@@ -504,28 +546,23 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
                                     f"ctrl_proj_{exp_dict[exp]}",
                                     f"computed_{m_var}_AIS_{group}_{model}_ctrl_proj_{exp_dict[exp]}.nc",
                                 )
+
                                 if remove_ctrl and os.path.isfile(ctrl_f):
                                     nc_ctrl = NC(ctrl_f)
                                     ctrl_time = nc_ctrl.variables["time"][:]
                                     m_ctrl = nc_ctrl.variables[m_var][:]
-                                    m_c = pd.Series(data=m_ctrl - m_ctrl[0], index=ctrl_time)
-                                    m_e -= m_c
-
-                                m_time = np.ceil(np.hstack((hist_time, m_e.index - 1)))
-                                m_mass = np.hstack((m_hist, m_e.values))
-
-                                n = len(m_time)
-                                dfs.append(
-                                    pd.DataFrame(
+                                    m_ctrl -= m_ctrl[0]
+                                    n_ctrl = len(m_ctrl)
+                                    ctrl_df = pd.DataFrame(
                                         data=np.hstack(
-                                            [
-                                                m_time.reshape(-1, 1),
-                                                m_mass.reshape(-1, 1),
-                                                np.repeat(group, n).reshape(-1, 1),
-                                                np.repeat(model, n).reshape(-1, 1),
-                                                np.repeat(exp, n).reshape(-1, 1),
-                                                np.repeat(rcp, n).reshape(-1, 1),
-                                            ]
+                                            (
+                                                ctrl_time.reshape(-1, 1),
+                                                m_ctrl.reshape(-1, 1),
+                                                np.repeat(group, n_ctrl).reshape(-1, 1),
+                                                np.repeat(model, n_ctrl).reshape(-1, 1),
+                                                np.repeat(exp, n_ctrl).reshape(-1, 1),
+                                                np.repeat(rcp, n_ctrl).reshape(-1, 1),
+                                            )
                                         ),
                                         columns=[
                                             "Year",
@@ -535,17 +572,12 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
                                             "Exp",
                                             "RCP",
                                         ],
-                                    )
-                                )
+                                    ).astype({"Year": float, m_desc: float})
+                                    exp_df[m_desc] -= ctrl_df[m_desc]
+
+                                dfs.append(pd.concat([hist_df, exp_df]))
         a_dfs.append(pd.concat(dfs))
-    df = pd.merge(a_dfs[0], a_dfs[-1], on=["Year", "Group", "Model", "Exp", "RCP"])
-    df = df.astype(
-        {
-            "Year": float,
-            "Cumulative ice sheet mass change (Gt)": float,
-            "Rate of surface mass balance anomaly (Gt/yr)": float,
-        }
-    ).drop_duplicates()
+    df = pd.concat(a_dfs)
     df["Cumulative ice sheet mass change (Gt)"] *= 910
     df["Cumulative ice sheet mass change (Gt)"] /= 1e12
 
@@ -555,9 +587,6 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
     df["Rate of ice sheet mass change (Gt/yr)"] = np.gradient(
         df["Cumulative ice sheet mass change (Gt)"].values
     ) / np.gradient(df["Year"].values)
-    df["Rate of ice dynamics anomaly (Gt/yr)"] = (
-        df["Rate of ice sheet mass change (Gt/yr)"] - df["Rate of surface mass balance anomaly (Gt/yr)"]
-    )
     df.to_csv(ismip6_filename, compression="gzip")
 
 
