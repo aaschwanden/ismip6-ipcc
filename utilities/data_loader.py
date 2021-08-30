@@ -469,7 +469,7 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
                                 # Experiment
                                 nc = NC(p)
                                 m_exp = nc.variables[m_var][:]
-                                m_exp -= m_exp[0]
+                                # m_exp -= m_exp[0]
                                 exp_time = nc.variables["time"][:]
                                 exp = p.name.split(f"computed_")[-1].split(".nc")[0].split("_")[-1]
                                 if exp in ["exp03", "exp07", "expA4", "expA8"]:
@@ -509,7 +509,7 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
                                 if os.path.isfile(hist_f):
                                     nc_hist = NC(hist_f)
                                     m_hist = nc_hist.variables[m_var][:]
-                                    m_hist -= m_hist[-1]
+                                    # m_hist -= m_hist[-1]
 
                                     # Historical simulations start at different years since initialization was left
                                     # up to the modelers
@@ -551,7 +551,7 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
                                     nc_ctrl = NC(ctrl_f)
                                     ctrl_time = nc_ctrl.variables["time"][:]
                                     m_ctrl = nc_ctrl.variables[m_var][:]
-                                    m_ctrl -= m_ctrl[0]
+                                    # m_ctrl -= m_ctrl[0]
                                     n_ctrl = len(m_ctrl)
                                     ctrl_df = pd.DataFrame(
                                         data=np.hstack(
@@ -575,11 +575,13 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
                                     ).astype({"Year": float, m_desc: float})
                                     exp_df[m_desc] -= ctrl_df[m_desc]
 
-                                dfs.append(pd.concat([hist_df, exp_df]))
+                                p_df = pd.concat([hist_df, exp_df])
+                                # p_df[m_desc] = p_df[p_df["Year"] == proj_start][m_desc]
+                                dfs.append(p_df)
         a_dfs.append(pd.concat(dfs))
     df = pd.concat(a_dfs)
-    df["Cumulative ice sheet mass change (Gt)"] *= 910
-    df["Cumulative ice sheet mass change (Gt)"] /= 1e12
+    # df["Cumulative ice sheet mass change (Gt)"] *= 910
+    # df["Cumulative ice sheet mass change (Gt)"] /= 1e12
 
     df["Rate of surface mass balance anomaly (Gt/yr)"] /= 1e12
     df["Rate of surface mass balance anomaly (Gt/yr)"] *= secpera
