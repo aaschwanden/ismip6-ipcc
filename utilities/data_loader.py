@@ -67,9 +67,9 @@ def get_credentials():
     return (username, password)
 
 
-def load_imbie_ant():
+def load_imbie_ais():
     """
-    Loading the IMBIE Greenland data set downloaded from
+    Loading the IMBIE Antarctica data set downloaded from
     http://imbie.org/data-files/imbie_dataset-2018_07_23.xlsx
     """
     imbie_df = pd.read_excel(
@@ -224,15 +224,15 @@ def load_grace():
     return grace
 
 
-def load_ismip6_ant(remove_ctrl=True):
+def load_ismip6_ais(remove_ctrl=True):
     outpath = "."
     v_dir = "ComputedScalarsPaper"
     url = "https://zenodo.org/record/3940766/files/ComputedScalarsPaper.zip"
 
     if remove_ctrl:
-        ismip6_filename = "ismip6_ant_ctrl_removed.csv.gz"
+        ismip6_filename = "ismip6_ais_ctrl_removed.csv.gz"
     else:
-        ismip6_filename = "ismip6_ant_ctrl.csv.gz"
+        ismip6_filename = "ismip6_ais_ctrl.csv.gz"
     if os.path.isfile(ismip6_filename):
         df = pd.read_csv(ismip6_filename)
     else:
@@ -242,7 +242,7 @@ def load_ismip6_ant(remove_ctrl=True):
                 with ZipFile(BytesIO(zipresp.read())) as zfile:
                     zfile.extractall(outpath)
         print("   ...and converting to CSV")
-        ismip6_ant_to_csv(v_dir, ismip6_filename, remove_ctrl)
+        ismip6_ais_to_csv(v_dir, ismip6_filename, remove_ctrl)
         df = pd.read_csv(ismip6_filename)
     return df
 
@@ -422,7 +422,7 @@ def ismip6_gris_to_csv(basedir, ismip6_filename, remove_ctrl):
     df.to_csv(ismip6_filename, compression="gzip")
 
 
-def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
+def ismip6_ais_to_csv(basedir, ismip6_filename, remove_ctrl):
     # Now read model output from each of the ISMIP6 files. The information we
     # need is in the file names, not the metadate so this is no fun.
     # Approach is to read each dataset into a dataframe, then concatenate all
@@ -471,6 +471,7 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
                                 m_exp = nc.variables[m_var][:]
                                 # m_exp -= m_exp[0]
                                 exp_time = nc.variables["time"][:]
+                                print(p, exp_time[0], exp_time[-1], len(exp_time))
                                 exp = p.name.split(f"computed_")[-1].split(".nc")[0].split("_")[-1]
                                 if exp in ["exp03", "exp07", "expA4", "expA8"]:
                                     rcp = 26
@@ -509,7 +510,7 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
                                 if os.path.isfile(hist_f):
                                     nc_hist = NC(hist_f)
                                     m_hist = nc_hist.variables[m_var][:]
-                                    # m_hist -= m_hist[-1]
+                                    m_hist -= m_hist[-1]
 
                                     # Historical simulations start at different years since initialization was left
                                     # up to the modelers
@@ -580,8 +581,8 @@ def ismip6_ant_to_csv(basedir, ismip6_filename, remove_ctrl):
                                 dfs.append(p_df)
         a_dfs.append(pd.concat(dfs))
     df = pd.concat(a_dfs)
-    # df["Cumulative ice sheet mass change (Gt)"] *= 910
-    # df["Cumulative ice sheet mass change (Gt)"] /= 1e12
+    df["Cumulative ice sheet mass change (Gt)"] *= 910
+    df["Cumulative ice sheet mass change (Gt)"] /= 1e12
 
     df["Rate of surface mass balance anomaly (Gt/yr)"] /= 1e12
     df["Rate of surface mass balance anomaly (Gt/yr)"] *= secpera
