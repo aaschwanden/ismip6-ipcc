@@ -224,15 +224,12 @@ def load_grace():
     return grace
 
 
-def load_ismip6_ais(remove_ctrl=True):
+def load_ismip6_ais():
     outpath = "."
     v_dir = "ComputedScalarsPaper"
     url = "https://zenodo.org/record/3940766/files/ComputedScalarsPaper.zip"
 
-    if remove_ctrl:
-        ismip6_filename = "ismip6_ais_ctrl_removed.csv.gz"
-    else:
-        ismip6_filename = "ismip6_ais_ctrl.csv.gz"
+    ismip6_filename = "ismip6_ais_ctrl_removed.csv.gz"
     if os.path.isfile(ismip6_filename):
         df = pd.read_csv(ismip6_filename)
     else:
@@ -242,20 +239,17 @@ def load_ismip6_ais(remove_ctrl=True):
                 with ZipFile(BytesIO(zipresp.read())) as zfile:
                     zfile.extractall(outpath)
         print("   ...and converting to CSV")
-        ismip6_ais_to_csv(v_dir, ismip6_filename, remove_ctrl)
+        ismip6_ais_to_csv(v_dir, ismip6_filename)
         df = pd.read_csv(ismip6_filename)
     return df
 
 
-def load_ismip6_gris(remove_ctrl=True):
+def load_ismip6_gris():
     outpath = "."
     v_dir = "v7_CMIP5_pub"
     url = f"https://zenodo.org/record/3939037/files/{v_dir}.zip"
 
-    if remove_ctrl:
-        ismip6_filename = "ismip6_gris_ctrl_removed.csv.gz"
-    else:
-        ismip6_filename = "ismip6_gris_ctrl.csv.gz"
+    ismip6_filename = "ismip6_gris_ctrl_removed.csv.gz"
 
     if os.path.isfile(ismip6_filename):
         df = pd.read_csv(ismip6_filename)
@@ -266,12 +260,12 @@ def load_ismip6_gris(remove_ctrl=True):
                 with ZipFile(BytesIO(zipresp.read())) as zfile:
                     zfile.extractall(outpath)
         print("   ...and converting to CSV")
-        ismip6_gris_to_csv(v_dir, ismip6_filename, remove_ctrl)
+        ismip6_gris_to_csv(v_dir, ismip6_filename)
         df = pd.read_csv(ismip6_filename)
     return df
 
 
-def ismip6_gris_to_csv(basedir, ismip6_filename, remove_ctrl):
+def ismip6_gris_to_csv(basedir, ismip6_filename):
     # Now read model output from each of the ISMIP6 files. The information we
     # need is in the file names, not the metadate so this is no fun.
     # Approach is to read each dataset into a dataframe, then concatenate all
@@ -333,20 +327,12 @@ def ismip6_gris_to_csv(basedir, ismip6_filename, remove_ctrl):
 
         # Historical
         nc_hist = NC(hist_file)
-        if remove_ctrl:
-            hist_sle = nc_hist.variables["sle"][:-1] - nc_hist.variables["sle"][-1]
-            hist_mass = (nc_hist.variables["limgr"][:-1] - nc_hist.variables["limgr"][-1]) / 1e12
-            hist_smb = nc_hist.variables["smb"][:-1] / 1e12 * secpera
-            proj_sle = exp_sle
-            proj_mass = exp_mass
-            proj_smb = exp_smb
-        else:
-            hist_sle = nc_hist.variables["sle"][:-1]
-            hist_mass = nc_hist.variables["limgr"][:-1] / 1e12
-            hist_smb = nc_hist.variables["smb"][:-1] / 1e12 * secpera
-            proj_sle = exp_sle + ctrl_sle
-            proj_mass = exp_mass + ctrl_mass
-            proj_smb = exp_smb + ctrl_smb
+        hist_sle = nc_hist.variables["sle"][:-1] - nc_hist.variables["sle"][-1]
+        hist_mass = (nc_hist.variables["limgr"][:-1] - nc_hist.variables["limgr"][-1]) / 1e12
+        hist_smb = nc_hist.variables["smb"][:-1] / 1e12 * secpera
+        proj_sle = exp_sle
+        proj_mass = exp_mass
+        proj_smb = exp_smb
 
         # Historical simulations start at different years since initialization was left
         # up to the modelers
@@ -422,7 +408,7 @@ def ismip6_gris_to_csv(basedir, ismip6_filename, remove_ctrl):
     df.to_csv(ismip6_filename, compression="gzip")
 
 
-def ismip6_ais_to_csv(basedir, ismip6_filename, remove_ctrl):
+def ismip6_ais_to_csv(basedir, ismip6_filename):
     # Now read model output from each of the ISMIP6 files. The information we
     # need is in the file names, not the metadate so this is no fun.
     # Approach is to read each dataset into a dataframe, then concatenate all
@@ -458,20 +444,19 @@ def ismip6_ais_to_csv(basedir, ismip6_filename, remove_ctrl):
     ):
         dfs = []
 
-        m_pattern = f"computed_{m_var}_AIS_*.nc"
+        m_pattern = f"computed_{m_var}_minus_ctrl_proj_AIS_*.nc"
 
         for group in os.listdir(basedir):
             if not group.startswith("."):
                 for model in os.listdir(os.path.join(basedir, group)):
                     if not model.startswith("."):
                         for p in Path(os.path.join(basedir, group, model)).rglob(m_pattern):
-                            if not ("ctrl" in str(p)) | ("hist" in str(p)):
+                            if not "hist" in str(p):
                                 # Experiment
                                 nc = NC(p)
                                 m_exp = nc.variables[m_var][:]
                                 # m_exp -= m_exp[0]
                                 exp_time = nc.variables["time"][:]
-                                print(p, exp_time[0], exp_time[-1], len(exp_time))
                                 exp = p.name.split(f"computed_")[-1].split(".nc")[0].split("_")[-1]
                                 if exp in ["exp03", "exp07", "expA4", "expA8"]:
                                     rcp = 26
@@ -540,44 +525,7 @@ def ismip6_ais_to_csv(basedir, ismip6_filename, remove_ctrl):
                                     ],
                                 ).astype({"Year": float, m_desc: float})
 
-                                ctrl_f = os.path.join(
-                                    basedir,
-                                    group,
-                                    model,
-                                    f"ctrl_proj_{exp_dict[exp]}",
-                                    f"computed_{m_var}_AIS_{group}_{model}_ctrl_proj_{exp_dict[exp]}.nc",
-                                )
-
-                                if remove_ctrl and os.path.isfile(ctrl_f):
-                                    nc_ctrl = NC(ctrl_f)
-                                    ctrl_time = nc_ctrl.variables["time"][:]
-                                    m_ctrl = nc_ctrl.variables[m_var][:]
-                                    # m_ctrl -= m_ctrl[0]
-                                    n_ctrl = len(m_ctrl)
-                                    ctrl_df = pd.DataFrame(
-                                        data=np.hstack(
-                                            (
-                                                ctrl_time.reshape(-1, 1),
-                                                m_ctrl.reshape(-1, 1),
-                                                np.repeat(group, n_ctrl).reshape(-1, 1),
-                                                np.repeat(model, n_ctrl).reshape(-1, 1),
-                                                np.repeat(exp, n_ctrl).reshape(-1, 1),
-                                                np.repeat(rcp, n_ctrl).reshape(-1, 1),
-                                            )
-                                        ),
-                                        columns=[
-                                            "Year",
-                                            m_desc,
-                                            "Group",
-                                            "Model",
-                                            "Exp",
-                                            "RCP",
-                                        ],
-                                    ).astype({"Year": float, m_desc: float})
-                                    exp_df[m_desc] -= ctrl_df[m_desc]
-
                                 p_df = pd.concat([hist_df, exp_df])
-                                # p_df[m_desc] = p_df[p_df["Year"] == proj_start][m_desc]
                                 dfs.append(p_df)
         a_dfs.append(pd.concat(dfs))
     df = pd.concat(a_dfs)
