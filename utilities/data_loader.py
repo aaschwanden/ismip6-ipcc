@@ -14,7 +14,7 @@ from glob import glob
 from netCDF4 import Dataset as NC
 from pathlib import Path
 
-from .helper import hist_start, hist_end, proj_start, proj_end, proj_time, secpera
+from .helper import hist_start, hist_end, proj_start, proj_end, proj_time, secpera, ais_exp_dict
 
 URS_URL = "https://urs.earthdata.nasa.gov"
 
@@ -415,29 +415,6 @@ def ismip6_ais_to_csv(basedir, ismip6_filename):
     #   dataframes into one Arch dataframe that contains all model runs.
     # Resulting dataframe consists of both historical and projected changes
 
-    exp_dict = {
-        "exp01": "open",
-        "exp02": "open",
-        "exp03": "open",
-        "exp04": "open",
-        "exp05": "std",
-        "exp06": "std",
-        "exp07": "std",
-        "exp08": "std",
-        "exp09": "std",
-        "exp10": "std",
-        "exp11": "open",
-        "exp12": "std",
-        "exp13": "std",
-        "expA1": "open",
-        "expA2": "open",
-        "expA3": "open",
-        "expA4": "open",
-        "expA5": "std",
-        "expA6": "std",
-        "expA7": "std",
-        "expA8": "std",
-    }
     a_dfs = []
     for m_var, m_desc in zip(
         ["ivol", "smb"], ["Cumulative ice sheet mass change (Gt)", "Rate of surface mass balance anomaly (Gt/yr)"]
@@ -489,7 +466,7 @@ def ismip6_ais_to_csv(basedir, ismip6_filename):
                                     basedir,
                                     group,
                                     model,
-                                    f"hist_{exp_dict[exp]}",
+                                    f"hist_{ais_exp_dict[exp]}",
                                     f"computed_{m_var}_AIS_{group}_{model}_hist_{exp_dict[exp]}.nc",
                                 )
                                 if os.path.isfile(hist_f):
