@@ -102,7 +102,7 @@ def load_imbie_ais():
     return imbie
 
 
-def load_imbie_gris():
+def load_imbie_gis():
     """
     Loading the IMBIE Greenland data set downloaded from
     http://imbie.org/wp-content/uploads/2012/11/imbie_dataset_greenland_dynamics-2020_02_28.xlsx
@@ -151,79 +151,6 @@ def load_imbie_gris():
     return imbie
 
 
-def load_mouginot():
-    """
-    Load the Mouginot et al (2019) data set
-    """
-    mou19_df = pd.read_excel(
-        "https://www.pnas.org/highwire/filestream/860129/field_highwire_adjunct_files/2/pnas.1904242116.sd02.xlsx",
-        sheet_name="(2) MB_GIS",
-        header=8,
-        usecols="B,AR:BJ",
-        engine="openpyxl",
-    )
-    mou19_d = mou19_df.iloc[7]
-    mou19_smb = mou19_df.iloc[19]
-    mou19_mass = mou19_df.iloc[41]
-    mou19 = pd.DataFrame(
-        data=np.hstack(
-            [
-                mou19_df.columns[1::].values.reshape(-1, 1),
-                mou19_mass.values[1::].reshape(-1, 1),
-                np.cumsum(mou19_smb.values[1::]).reshape(-1, 1),
-                -np.cumsum(mou19_d.values[1::]).reshape(-1, 1),
-                mou19_smb.values[1::].reshape(-1, 1),
-                -mou19_d.values[1::].reshape(-1, 1),
-            ]
-        ),
-        columns=[
-            "Year",
-            "Cumulative ice sheet mass change (Gt)",
-            "Cumulative surface mass balance anomaly (Gt)",
-            "Cumulative ice dynamics anomaly (Gt)",
-            "Rate of surface mass balance anomaly (Gt/yr)",
-            "Rate of ice dynamics anomaly (Gt/yr)",
-        ],
-    )
-    mou19 = mou19.astype(
-        {
-            "Year": float,
-            "Cumulative ice sheet mass change (Gt)": float,
-            "Cumulative surface mass balance anomaly (Gt)": float,
-            "Cumulative ice dynamics anomaly (Gt)": float,
-            "Rate of surface mass balance anomaly (Gt/yr)": float,
-            "Rate of ice dynamics anomaly (Gt/yr)": float,
-        }
-    )
-
-    # Normalize
-    for v in [
-        "Cumulative ice sheet mass change (Gt)",
-        "Cumulative ice dynamics anomaly (Gt)",
-        "Cumulative surface mass balance anomaly (Gt)",
-    ]:
-        mou19[v] -= mou19[mou19["Year"] == proj_start][v].values
-
-    return mou19
-
-
-def load_grace():
-
-    grace = pd.read_csv(
-        "grace/greenland_mass_200204_202102.txt",
-        header=30,
-        delim_whitespace=True,
-        skipinitialspace=True,
-        names=["Year", "Cumulative ice sheet mass change (Gt)", "Cumulative ice sheet mass change uncertainty (Gt)"],
-    )
-    # Normalize GRACE signal to the starting date of the projection
-    grace["Cumulative ice sheet mass change (Gt)"] -= np.interp(
-        proj_start, grace["Year"], grace["Cumulative ice sheet mass change (Gt)"]
-    )
-
-    return grace
-
-
 def load_ismip6_ais(remove_ctrl=True):
     outpath = "."
     v_dir = "ComputedScalarsPaper"
@@ -247,15 +174,15 @@ def load_ismip6_ais(remove_ctrl=True):
     return df
 
 
-def load_ismip6_gris(remove_ctrl=True):
+def load_ismip6_gis(remove_ctrl=True):
     outpath = "."
     v_dir = "v7_CMIP5_pub"
     url = f"https://zenodo.org/record/3939037/files/{v_dir}.zip"
 
     if remove_ctrl:
-        ismip6_filename = "ismip6_gris_ctrl_removed.csv.gz"
+        ismip6_filename = "ismip6_gis_ctrl_removed.csv.gz"
     else:
-        ismip6_filename = "ismip6_gris_ctrl.csv.gz"
+        ismip6_filename = "ismip6_gis_ctrl.csv.gz"
 
     if os.path.isfile(ismip6_filename):
         df = pd.read_csv(ismip6_filename)
@@ -266,12 +193,12 @@ def load_ismip6_gris(remove_ctrl=True):
                 with ZipFile(BytesIO(zipresp.read())) as zfile:
                     zfile.extractall(outpath)
         print("   ...and converting to CSV")
-        ismip6_gris_to_csv(v_dir, ismip6_filename, remove_ctrl)
+        ismip6_gis_to_csv(v_dir, ismip6_filename, remove_ctrl)
         df = pd.read_csv(ismip6_filename)
     return df
 
 
-def ismip6_gris_to_csv(basedir, ismip6_filename, remove_ctrl):
+def ismip6_gis_to_csv(basedir, ismip6_filename, remove_ctrl):
     # Now read model output from each of the ISMIP6 files. The information we
     # need is in the file names, not the metadate so this is no fun.
     # Approach is to read each dataset into a dataframe, then concatenate all
@@ -452,8 +379,8 @@ def ismip6_ais_to_csv(basedir, ismip6_filename, remove_ctrl):
                                 # Experiment
                                 nc = NC(p)
                                 m_exp = nc.variables[m_var][:]
-                                if not remove_ctrl:
-                                    m_exp -= m_exp[0]
+                                # if not remove_ctrl:
+                                #     m_exp -= m_exp[0]
                                 exp_time = nc.variables["time"][:]
                                 exp = p.name.split(f"computed_")[-1].split(".nc")[0].split("_")[-1]
                                 if exp in ["exp03", "exp07", "expA4", "expA8"]:
@@ -493,7 +420,8 @@ def ismip6_ais_to_csv(basedir, ismip6_filename, remove_ctrl):
                                 if os.path.isfile(hist_f):
                                     nc_hist = NC(hist_f)
                                     m_hist = nc_hist.variables[m_var][:]
-                                    m_hist -= m_hist[-1]
+                                    if remove_ctrl:
+                                        m_hist -= m_hist[-1]
 
                                     # Historical simulations start at different years since initialization was left
                                     # up to the modelers
@@ -524,6 +452,10 @@ def ismip6_ais_to_csv(basedir, ismip6_filename, remove_ctrl):
                                 ).astype({"Year": float, m_desc: float})
 
                                 p_df = pd.concat([hist_df, exp_df])
+
+                                if not remove_ctrl:
+                                    if m_var == "ivol":
+                                        p_df[m_desc] -= p_df[p_df["Year"] == proj_start][m_desc].values
                                 dfs.append(p_df)
         a_dfs.append(pd.concat(dfs))
     df = pd.concat(a_dfs)

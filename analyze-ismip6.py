@@ -584,7 +584,7 @@ simulated_signal_color = "0.7"
 gt2cmSLE = 1.0 / 362.5 / 10.0
 
 rcp_list = ["26", "45", "85"]
-rcp_col_dict = {"CTRL": "k", 85: "#990002", 45: "#5492CD", 26: "#003466"}
+rcp_col_dict = {26: "#003466", 45: "#5492CD", 85: "#990002"}
 
 # Where the ISMIP6 simulations reside
 basedir = "v7_CMIP5_pub"

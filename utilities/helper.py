@@ -30,3 +30,27 @@ ais_exp_dict = {
     "expA7": "std",
     "expA8": "std",
 }
+
+gis_exp_dict = {
+    "exp01": "open",
+    "exp02": "open",
+    "exp03": "open",
+    "exp04": "open",
+    "exp05": "std",
+    "exp06": "std",
+    "exp07": "std",
+    "exp08": "std",
+    "exp09": "std",
+    "exp10": "std",
+    "exp11": "open",
+    "exp12": "std",
+    "exp13": "std",
+    "expA1": "open",
+    "expA2": "open",
+    "expA3": "open",
+    "expA4": "open",
+    "expA5": "std",
+    "expA6": "std",
+    "expA7": "std",
+    "expA8": "std",
+}
