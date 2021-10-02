@@ -92,9 +92,14 @@ def load_imbie_ais():
 
     for v in [
         "Cumulative ice sheet mass change (Gt)",
-        "Cumulative ice sheet mass change uncertainty (Gt)",
     ]:
         imbie[v] -= imbie[imbie["Year"] == proj_start][v].values
+
+    for v in [
+        "Cumulative ice sheet mass change uncertainty (Gt)",
+    ]:
+        imbie[v] -= imbie[v].values[-1]
+        imbie[v] *= -1
 
     imbie["Rate of ice sheet mass change (Gt/yr)"] = np.gradient(
         imbie["Cumulative ice sheet mass change (Gt)"]
@@ -147,6 +152,11 @@ def load_imbie_gis():
     smb_mean = s["Cumulative surface mass balance anomaly (Gt)"].mean() / (1990 - 1980)
     imbie[f"Rate of surface mass balance anomaly (Gt/yr)"] += 2 * 1964 / 10
     imbie[f"Rate of ice dynamics anomaly (Gt/yr)"] -= 2 * 1964 / 10
+    for v in [
+        "Cumulative ice sheet mass change uncertainty (Gt)",
+    ]:
+        imbie[v] -= imbie[v].values[-1]
+        imbie[v] *= -1
 
     return imbie
 
