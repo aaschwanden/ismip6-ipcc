@@ -245,15 +245,15 @@ def ismip6_gis_to_csv(basedir, ismip6_filename, remove_ctrl):
         else:
             rcp = 85
         # Find the coressponding CTRL Historical simulations
-        ctrl_file = [m for m in ctrl_files if (f"{group}_{model}" in m.name)][0]
-        hist_file = [m for m in hist_files if (f"{group}_{model}" in m.name)][0]
+        ctrl_file = [m for m in ctrl_files if (f"_{group}_{model}_" in m.name)][0]
+        hist_file = [m for m in hist_files if (f"_{group}_{model}_" in m.name)][0]
 
         # The last entry of the historical and the first entry of the projection are the same
 
         # Projection
         nc_ctrl = NC(ctrl_file)
-        ctrl_sle = nc_ctrl.variables["sle"][:]
-        ctrl_mass = nc_ctrl.variables["limgr"][:] / 1e12
+        ctrl_sle = nc_ctrl.variables["sle"][:] - nc_ctrl.variables["sle"][0]
+        ctrl_mass = (nc_ctrl.variables["limgr"][:] - nc_ctrl.variables["limgr"][0]) / 1e12
         ctrl_smb = nc_ctrl.variables["smb"][:] / 1e12 * secpera
 
         # Per email with Heiko on Nov. 13, 2020, stick with just the exp projections alone, without adding back the ctrl projections
@@ -270,17 +270,14 @@ def ismip6_gis_to_csv(basedir, ismip6_filename, remove_ctrl):
 
         # Historical
         nc_hist = NC(hist_file)
+        hist_sle = nc_hist.variables["sle"][:-1] - nc_hist.variables["sle"][-1]
+        hist_mass = (nc_hist.variables["limgr"][:-1] - nc_hist.variables["limgr"][-1]) / 1e12
+        hist_smb = nc_hist.variables["smb"][:-1] / 1e12 * secpera
         if remove_ctrl:
-            hist_sle = nc_hist.variables["sle"][:-1] - nc_hist.variables["sle"][-1]
-            hist_mass = (nc_hist.variables["limgr"][:-1] - nc_hist.variables["limgr"][-1]) / 1e12
-            hist_smb = nc_hist.variables["smb"][:-1] / 1e12 * secpera
             proj_sle = exp_sle
             proj_mass = exp_mass
             proj_smb = exp_smb
         else:
-            hist_sle = nc_hist.variables["sle"][:-1]
-            hist_mass = nc_hist.variables["limgr"][:-1] / 1e12
-            hist_smb = nc_hist.variables["smb"][:-1] / 1e12 * secpera
             proj_sle = exp_sle + ctrl_sle
             proj_mass = exp_mass + ctrl_mass
             proj_smb = exp_smb + ctrl_smb
@@ -288,6 +285,7 @@ def ismip6_gis_to_csv(basedir, ismip6_filename, remove_ctrl):
         # Historical simulations start at different years since initialization was left
         # up to the modelers
         hist_time = -np.arange(len(hist_sle))[::-1] + hist_end
+        print(group, model, hist_time)
 
         # Let's add the data to the main DataFrame
         m_time = np.hstack((hist_time, proj_time))
