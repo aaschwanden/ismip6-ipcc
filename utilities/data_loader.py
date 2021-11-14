@@ -16,56 +16,6 @@ from pathlib import Path
 
 from .helper import hist_start, hist_end, proj_start, proj_end, proj_time, secpera, ais_exp_dict
 
-URS_URL = "https://urs.earthdata.nasa.gov"
-
-
-def get_username():
-    username = ""
-
-    # For Python 2/3 compatibility:
-    try:
-        do_input = raw_input  # noqa
-    except NameError:
-        do_input = input
-
-    while not username:
-        try:
-            username = do_input("Earthdata username: ")
-        except KeyboardInterrupt:
-            quit()
-    return username
-
-
-def get_password():
-    password = ""
-    while not password:
-        try:
-            password = getpass.getpass("password: ")
-        except KeyboardInterrupt:
-            quit()
-    return password
-
-
-def get_credentials():
-    """Get user credentials from .netrc or prompt for input."""
-    credentials = None
-    errprefix = ""
-    try:
-        info = netrc.netrc()
-        username, account, password = info.authenticators(urlparse(URS_URL).hostname)
-        errprefix = "netrc error: "
-    except Exception as e:
-        if not ("No such file" in str(e)):
-            print("netrc error: {0}".format(str(e)))
-        username = None
-        password = None
-
-    if not username:
-        username = get_username()
-        password = get_password()
-
-    return (username, password)
-
 
 def load_imbie_ais():
     """
@@ -285,7 +235,6 @@ def ismip6_gis_to_csv(basedir, ismip6_filename, remove_ctrl):
         # Historical simulations start at different years since initialization was left
         # up to the modelers
         hist_time = -np.arange(len(hist_sle))[::-1] + hist_end
-        print(group, model, hist_time)
 
         # Let's add the data to the main DataFrame
         m_time = np.hstack((hist_time, proj_time))
