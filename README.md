@@ -1,8 +1,10 @@
 # ISMIP6-IPCC
 
-This repository lets you recreate the figures in Aschwanden et al (2021), along with a few additional figures. You can either clone the repository or just click on the Binder link below.
+This repository lets you recreate the figures in Aschwanden et al (2021), along with a few additional figures.
 
 ## Interactive Notebook in Binder
+
+You can either clone the repository or just click on the Binder link below.
 
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/aaschwanden/ismip6-ipcc/HEAD?filepath=analyze_slr_predictions.ipynb)
 
@@ -16,7 +18,7 @@ The following data sets are used and downloaded at run-time:
 - Simulations Greenland: [ISMIP6 Greenland](https://doi.org/10.5281/zenodo.3939037)
 - Observations Antarctica and Greenland: [IMBIE](http://imbie.org)
 
-## References:
+## References
 
 Aschwanden, Brinkerhoff, Bartholomaus, and Truffer (2021)
 
