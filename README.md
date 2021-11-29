@@ -2,6 +2,8 @@
 
 This repository lets you recreate the figures in Aschwanden et al (2021), along with a few additional figures.
 
+[![DOI](https://zenodo.org/badge/305867053.svg)](https://zenodo.org/badge/latestdoi/305867053)
+
 ## Interactive Notebook in Binder
 
 You can either clone the repository or just click on the Binder link below.
@@ -20,7 +22,7 @@ The following data sets are used and downloaded at run-time:
 
 ## References
 
-Aschwanden, Brinkerhoff, Bartholomaus, and Truffer (2021)
+Aschwanden, Brinkerhoff, Bartholomaus, and Truffer (2021): (in press)
 
 Seroussi, H. et al. (2020) ‘ISMIP6 Antarctica: a multi-model ensemble of the Antarctic ice sheet evolution over the 21st century’, The Cryosphere(pp. 1–54). doi: 10.5194/tc-2019-324.
 
