@@ -22,7 +22,7 @@ The following data sets are used and downloaded at run-time:
 
 ## References
 
-Aschwanden, Brinkerhoff, Bartholomaus, and Truffer (2021): (in press)
+Aschwanden, A., Bartholomaus, T. C., Brinkerhoff, D. J., & Truffer, M. (2021)  ‘Brief communication: A roadmap towards credible projections of ice sheet contribution to sea level’, The Cryosphere, 15(12), 5705–5715. https://doi.org/10.5194/tc-15-5705-2021
 
 Seroussi, H. et al. (2020) ‘ISMIP6 Antarctica: a multi-model ensemble of the Antarctic ice sheet evolution over the 21st century’, The Cryosphere(pp. 1–54). doi: 10.5194/tc-2019-324.
 
