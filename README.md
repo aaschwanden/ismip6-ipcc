@@ -2,7 +2,7 @@
 
 This repository lets you recreate the figures in Aschwanden et al (2021), along with a few additional figures.
 
-[![DOI](https://zenodo.org/badge/305867053.svg)](https://zenodo.org/badge/latestdoi/305867053)
+[![DOI](https://zenodo.org/badge/305867053.svg)](https://zenodo.org/badge/latestdoi/305867053) [![License: GPL-3.0](https://img.shields.io:/github/license/aaschwanden/ismip6-ipcc)](https://opensource.org/licenses/GPL-3.0)
 
 ## Interactive Notebook in Binder
 
